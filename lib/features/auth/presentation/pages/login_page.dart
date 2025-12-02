@@ -271,6 +271,16 @@ class _LoginPageState extends State<LoginPage> {
               );
             },
           ),
+          const SizedBox(height: 32),
+
+          // Developer Credit
+          Text(
+            'Developed by Netsphere Technologies Pvt. Ltd.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
+                ),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

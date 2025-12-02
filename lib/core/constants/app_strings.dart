@@ -43,6 +43,37 @@ class AppStrings {
   static const String auctionSettings = 'Auction Settings';
   static const String bidHistory = 'Bid History';
 
+  // Auction Management
+  static const String createAuction = 'Create Auction';
+  static const String editAuction = 'Edit Auction';
+  static const String deleteAuction = 'Delete Auction';
+  static const String auctionName = 'Auction Name';
+  static const String selectCategory = 'Select Category';
+  static const String startDate = 'Start Date';
+  static const String endDate = 'End Date';
+  static const String selectMode = 'Select Mode';
+  static const String checkBasePrice = 'Check Base Price';
+  static const String selectEventType = 'Select Event Type';
+  static const String eventId = 'Event ID';
+  static const String bidReport = 'Bid Report';
+  static const String uploadImagesZip = 'Upload Images Zip';
+  static const String selectZipType = 'Select Zip Type';
+  static const String openAuction = 'Open Auction';
+  static const String onlineAuction = 'Online';
+  static const String contractNo = 'Contract No';
+  static const String rcNo = 'RC No';
+  static const String inactiveAuctions = 'Inactive Auctions';
+  static const String auctionAccessUsers = 'Access Users';
+  static const String metaHighestBid = 'Highest Bids';
+
+  // Event Types
+  static const String eventLNT = 'LNT';
+  static const String eventTCF = 'TCF';
+  static const String eventMNBAF = 'MNBAF';
+  static const String eventHDBF = 'HDBF';
+  static const String eventCWCF = 'CWCF';
+  static const String eventOther = 'Other';
+
   // Property Auction
   static const String addProperty = 'Add Property';
   static const String editProperty = 'Edit Property';
