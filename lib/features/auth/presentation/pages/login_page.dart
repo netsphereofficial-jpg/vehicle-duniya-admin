@@ -55,167 +55,132 @@ class _LoginPageState extends State<LoginPage> {
             context.go('/dashboard');
           }
         },
-        child: Row(
-          children: [
-            // Left Panel - Branding
-            Expanded(
-              flex: 5,
-              child: Container(
-                color: AppColors.primary,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 900;
+
+            if (isMobile) {
+              // Mobile Layout - Single column
+              return Container(
+                color: AppColors.background,
+                child: SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        // Logo for mobile
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.2),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/images/vehicle_duniya_logo.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.directions_car,
-                          size: 60,
-                          color: Colors.white,
+                        const SizedBox(height: 16),
+                        Text(
+                          AppStrings.appName,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      const Text(
-                        AppStrings.appName,
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        AppStrings.appTagline,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildFeatureItem(Icons.gavel, 'Vehicle Auctions'),
-                            const SizedBox(height: 12),
-                            _buildFeatureItem(Icons.home_work, 'Property Auctions'),
-                            const SizedBox(height: 12),
-                            _buildFeatureItem(Icons.storefront, 'Car Bazaar'),
-                            const SizedBox(height: 12),
-                            _buildFeatureItem(Icons.people, 'User Management'),
-                          ],
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 32),
+                        _buildLoginForm(context),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            }
 
-            // Right Panel - Login Form
-            Expanded(
-              flex: 4,
-              child: Container(
-                color: AppColors.background,
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(48),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      child: Form(
-                        key: _formKey,
+            // Desktop Layout - Two columns
+            return Row(
+              children: [
+                // Left Panel - Branding
+                Expanded(
+                  flex: 5,
+                  child: Container(
+                    color: AppColors.primary,
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(32),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              AppStrings.loginTitle,
-                              style: Theme.of(context).textTheme.displaySmall,
+                            // Logo Image
+                            Container(
+                              width: 150,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              child: Image.asset(
+                                'assets/images/vehicle_duniya_logo.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            const Text(
+                              AppStrings.appName,
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              AppStrings.loginSubtitle,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                            ),
-                            const SizedBox(height: 48),
-
-                            // Email Field
-                            CustomTextField(
-                              label: AppStrings.email,
-                              hint: 'admin@vehicleduniya.com',
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              prefixIcon: Icons.email_outlined,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return AppStrings.invalidEmail;
-                                }
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                    .hasMatch(value)) {
-                                  return AppStrings.invalidEmail;
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 24),
-
-                            // Password Field
-                            CustomTextField(
-                              label: AppStrings.password,
-                              hint: 'Enter your password',
-                              controller: _passwordController,
-                              obscureText: true,
-                              prefixIcon: Icons.lock_outlined,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _onLogin(),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return AppStrings.invalidPassword;
-                                }
-                                if (value.length < 6) {
-                                  return AppStrings.invalidPassword;
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Forgot Password
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {
-                                  // TODO: Implement forgot password
-                                },
-                                child: const Text(AppStrings.forgotPassword),
+                              AppStrings.appTagline,
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white.withValues(alpha: 0.8),
                               ),
                             ),
-                            const SizedBox(height: 24),
-
-                            // Login Button
-                            BlocBuilder<AuthBloc, AuthState>(
-                              builder: (context, state) {
-                                return CustomButton(
-                                  text: AppStrings.login,
-                                  isFullWidth: true,
-                                  isLoading: state.isLoading,
-                                  onPressed: _onLogin,
-                                  height: 52,
-                                );
-                              },
+                            const SizedBox(height: 48),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildFeatureItem(Icons.gavel, 'Vehicle Auctions'),
+                                  const SizedBox(height: 14),
+                                  _buildFeatureItem(Icons.home_work, 'Property Auctions'),
+                                  const SizedBox(height: 14),
+                                  _buildFeatureItem(Icons.storefront, 'Car Bazaar'),
+                                  const SizedBox(height: 14),
+                                  _buildFeatureItem(Icons.people, 'User Management'),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -223,10 +188,117 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
+
+                // Right Panel - Login Form
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    color: AppColors.background,
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(48),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 400),
+                          child: _buildLoginForm(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _buildLoginForm(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            AppStrings.loginTitle,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            AppStrings.loginSubtitle,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+          const SizedBox(height: 32),
+
+          // Email Field
+          CustomTextField(
+            label: AppStrings.email,
+            hint: 'admin@vehicleduniya.com',
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            prefixIcon: Icons.email_outlined,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return AppStrings.invalidEmail;
+              }
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                return AppStrings.invalidEmail;
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // Password Field
+          CustomTextField(
+            label: AppStrings.password,
+            hint: 'Enter your password',
+            controller: _passwordController,
+            obscureText: true,
+            prefixIcon: Icons.lock_outlined,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _onLogin(),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return AppStrings.invalidPassword;
+              }
+              if (value.length < 6) {
+                return AppStrings.invalidPassword;
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Forgot Password
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                // TODO: Implement forgot password
+              },
+              child: const Text(AppStrings.forgotPassword),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Login Button
+          BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, state) {
+              return CustomButton(
+                text: AppStrings.login,
+                isFullWidth: true,
+                isLoading: state.isLoading,
+                onPressed: _onLogin,
+                height: 52,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
