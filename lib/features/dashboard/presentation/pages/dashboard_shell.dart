@@ -309,9 +309,9 @@ class ResponsiveSidebar extends StatelessWidget {
 
   Widget _buildCollapsedLogo() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: Image.asset(
-        'assets/images/vehicle_duniya_logo.png',
+        'assets/images/vehicle_duniya_logo_with_bg.png',
         width: 48,
         height: 48,
         fit: BoxFit.contain,
@@ -323,11 +323,11 @@ class ResponsiveSidebar extends StatelessWidget {
     return Row(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: Image.asset(
-            'assets/images/vehicle_duniya_logo.png',
-            width: 50,
-            height: 50,
+            'assets/images/vehicle_duniya_logo_with_bg.png',
+            width: 55,
+            height: 55,
             fit: BoxFit.contain,
           ),
         ),
@@ -337,18 +337,18 @@ class ResponsiveSidebar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Vehicle Duniya',
+                'Admin Panel',
                 style: TextStyle(
                   color: AppColors.sidebarText,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                'Admin Panel',
+                'Manage your platform',
                 style: TextStyle(
                   color: AppColors.sidebarTextMuted,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
             ],

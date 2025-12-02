@@ -69,34 +69,15 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       children: [
                         const SizedBox(height: 20),
-                        // Logo for mobile
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.2),
-                                blurRadius: 15,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.all(8),
+                        // Logo for mobile (with integrated branding)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
                           child: Image.asset(
-                            'assets/images/vehicle_duniya_logo.png',
+                            'assets/images/vehicle_duniya_logo_with_bg.png',
+                            width: 140,
+                            height: 140,
                             fit: BoxFit.contain,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          AppStrings.appName,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
                         ),
                         const SizedBox(height: 32),
                         _buildLoginForm(context),
@@ -121,44 +102,36 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Logo Image
+                            // Logo with integrated branding
                             Container(
-                              width: 150,
-                              height: 150,
                               decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 25,
+                                    offset: const Offset(0, 12),
                                   ),
                                 ],
                               ),
-                              padding: const EdgeInsets.all(12),
-                              child: Image.asset(
-                                'assets/images/vehicle_duniya_logo.png',
-                                fit: BoxFit.contain,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: Image.asset(
+                                  'assets/images/vehicle_duniya_logo_with_bg.png',
+                                  width: 200,
+                                  height: 200,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 32),
-                            const Text(
-                              AppStrings.appName,
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
                             Text(
                               AppStrings.appTagline,
                               style: TextStyle(
                                 fontSize: 18,
-                                color: Colors.white.withValues(alpha: 0.8),
+                                color: Colors.white.withValues(alpha: 0.9),
                               ),
+                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 48),
                             Container(
