@@ -1,12 +1,14 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../../core/utils/app_logger.dart';
 import '../../domain/repositories/auction_repository.dart';
 import 'auction_event.dart';
 import 'auction_state.dart';
 
 /// BLoC for managing auction state and operations
 class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
+  static const _tag = 'AuctionBloc';
   final AuctionRepository _repository;
   final FirebaseAuth _auth;
 
@@ -49,10 +51,13 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     LoadCategoriesRequested event,
     Emitter<AuctionState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'LoadCategoriesRequested');
     try {
       final categories = await _repository.getCategories();
+      AppLogger.info(_tag, 'Loaded ${categories.length} categories');
       emit(state.copyWith(categories: categories));
     } catch (e) {
+      AppLogger.error(_tag, 'Failed to load categories', e);
       emit(state.copyWith(
         status: AuctionStateStatus.error,
         errorMessage: 'Failed to load categories: ${e.toString()}',
@@ -66,6 +71,8 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     LoadAuctionsRequested event,
     Emitter<AuctionState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'LoadAuctionsRequested');
+    AppLogger.debug(_tag, 'Filter: ${event.statusFilter ?? "none"}');
     emit(state.copyWith(
       status: AuctionStateStatus.loading,
       currentFilter: event.statusFilter,
@@ -76,11 +83,13 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
       final auctions = await _repository.getAuctions(
         statusFilter: event.statusFilter,
       );
+      AppLogger.info(_tag, 'Loaded ${auctions.length} auctions');
       emit(state.copyWith(
         status: AuctionStateStatus.loaded,
         auctions: auctions,
       ));
     } catch (e) {
+      AppLogger.error(_tag, 'Failed to load auctions', e);
       emit(state.copyWith(
         status: AuctionStateStatus.error,
         errorMessage: 'Failed to load auctions: ${e.toString()}',
@@ -92,11 +101,14 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     LoadAuctionDetailRequested event,
     Emitter<AuctionState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'LoadAuctionDetailRequested');
+    AppLogger.debug(_tag, 'Auction ID: ${event.auctionId}');
     emit(state.copyWith(status: AuctionStateStatus.loading));
 
     try {
       final auction = await _repository.getAuctionById(event.auctionId);
       final vehicles = await _repository.getVehiclesByAuction(event.auctionId);
+      AppLogger.info(_tag, 'Loaded auction: ${auction.name} with ${vehicles.length} vehicles');
 
       emit(state.copyWith(
         status: AuctionStateStatus.loaded,
@@ -104,6 +116,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
         auctionVehicles: vehicles,
       ));
     } catch (e) {
+      AppLogger.error(_tag, 'Failed to load auction details', e);
       emit(state.copyWith(
         status: AuctionStateStatus.error,
         errorMessage: 'Failed to load auction details: ${e.toString()}',
@@ -115,11 +128,14 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     CreateAuctionRequested event,
     Emitter<AuctionState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'CreateAuctionRequested');
+    AppLogger.debug(_tag, 'Creating auction: ${event.name}');
     emit(state.copyWith(status: AuctionStateStatus.creating));
 
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
+        AppLogger.error(_tag, 'User not authenticated');
         throw Exception('User not authenticated');
       }
 
@@ -136,6 +152,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
         createdBy: currentUser.uid,
       );
 
+      AppLogger.info(_tag, 'Auction created: ${auction.id}');
       emit(state.copyWith(
         status: AuctionStateStatus.created,
         auctions: [auction, ...state.auctions],
@@ -143,6 +160,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
         successMessage: 'Auction created successfully!',
       ));
     } catch (e) {
+      AppLogger.error(_tag, 'Failed to create auction', e);
       emit(state.copyWith(
         status: AuctionStateStatus.error,
         errorMessage: 'Failed to create auction: ${e.toString()}',
@@ -154,6 +172,8 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     UpdateAuctionRequested event,
     Emitter<AuctionState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'UpdateAuctionRequested');
+    AppLogger.debug(_tag, 'Updating auction: ${event.auctionId}');
     emit(state.copyWith(status: AuctionStateStatus.updating));
 
     try {
@@ -167,6 +187,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
         return a.id == event.auctionId ? updatedAuction : a;
       }).toList();
 
+      AppLogger.info(_tag, 'Auction updated: ${event.auctionId}');
       emit(state.copyWith(
         status: AuctionStateStatus.updated,
         auctions: updatedAuctions,
@@ -176,6 +197,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
         successMessage: 'Auction updated successfully!',
       ));
     } catch (e) {
+      AppLogger.error(_tag, 'Failed to update auction', e);
       emit(state.copyWith(
         status: AuctionStateStatus.error,
         errorMessage: 'Failed to update auction: ${e.toString()}',
@@ -187,6 +209,8 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     DeleteAuctionRequested event,
     Emitter<AuctionState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'DeleteAuctionRequested');
+    AppLogger.warning(_tag, 'Deleting auction: ${event.auctionId}');
     emit(state.copyWith(status: AuctionStateStatus.deleting));
 
     try {
@@ -197,6 +221,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
           .where((a) => a.id != event.auctionId)
           .toList();
 
+      AppLogger.info(_tag, 'Auction deleted: ${event.auctionId}');
       emit(state.copyWith(
         status: AuctionStateStatus.deleted,
         auctions: updatedAuctions,
@@ -204,6 +229,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
         successMessage: 'Auction deleted successfully!',
       ));
     } catch (e) {
+      AppLogger.error(_tag, 'Failed to delete auction', e);
       emit(state.copyWith(
         status: AuctionStateStatus.error,
         errorMessage: 'Failed to delete auction: ${e.toString()}',

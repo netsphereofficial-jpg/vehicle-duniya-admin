@@ -1,4 +1,3 @@
-// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -198,7 +197,7 @@ class _InactiveAuctionsPageState extends State<InactiveAuctionsPage> {
 
   Widget _buildStatusFilter() {
     return DropdownButtonFormField<AuctionStatus?>(
-      value: _statusFilter,
+      initialValue: _statusFilter,
       decoration: InputDecoration(
         hintText: 'Filter by status',
         border: OutlineInputBorder(

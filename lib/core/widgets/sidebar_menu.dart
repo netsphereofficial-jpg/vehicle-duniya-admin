@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_event.dart';
 import '../constants/app_colors.dart';
-import '../constants/app_strings.dart';
 
+/// Optimized sidebar menu with efficient state management
 class SidebarMenu extends StatefulWidget {
   final String currentRoute;
   final bool isCollapsed;
@@ -20,29 +23,60 @@ class SidebarMenu extends StatefulWidget {
 }
 
 class _SidebarMenuState extends State<SidebarMenu> {
-  bool _isVehiclesExpanded = false;
+  // Use a Set for efficient expansion state tracking
+  final Set<String> _expandedMenus = {};
+
+  // Define all expandable menu prefixes once
+  static const _expandableMenuPrefixes = [
+    '/vehicle-auctions',
+    '/property-auctions',
+    '/car-bazaar',
+    '/bids',
+    '/users',
+    '/analytics',
+    '/staff',
+    '/settings',
+  ];
 
   @override
   void initState() {
     super.initState();
-    // Auto-expand if a vehicle route is active
-    _isVehiclesExpanded = widget.currentRoute.startsWith('/vehicles');
+    _autoExpandActiveMenu();
   }
 
   @override
   void didUpdateWidget(SidebarMenu oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Auto-expand when navigating to vehicle routes
-    if (widget.currentRoute.startsWith('/vehicles') && !_isVehiclesExpanded) {
-      setState(() {
-        _isVehiclesExpanded = true;
-      });
+    // Only update if route actually changed
+    if (oldWidget.currentRoute != widget.currentRoute) {
+      _autoExpandActiveMenu();
     }
   }
 
+  void _autoExpandActiveMenu() {
+    for (final prefix in _expandableMenuPrefixes) {
+      if (widget.currentRoute.startsWith(prefix)) {
+        _expandedMenus.add(prefix);
+        break;
+      }
+    }
+  }
+
+  void _toggleMenu(String prefix) {
+    setState(() {
+      if (_expandedMenus.contains(prefix)) {
+        _expandedMenus.remove(prefix);
+      } else {
+        _expandedMenus.add(prefix);
+      }
+    });
+  }
+
+  bool _isExpanded(String prefix) => _expandedMenus.contains(prefix);
+
   @override
   Widget build(BuildContext context) {
-    final width = widget.isCollapsed ? 80.0 : 260.0;
+    final width = widget.isCollapsed ? 80.0 : 280.0;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -51,13 +85,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
       child: Column(
         children: [
           // Logo Section
-          Container(
-            padding: EdgeInsets.all(widget.isCollapsed ? 16 : 20),
-            child: widget.isCollapsed
-                ? _buildCollapsedLogo()
-                : _buildExpandedLogo(),
-          ),
-
+          _SidebarLogo(isCollapsed: widget.isCollapsed),
           const Divider(color: AppColors.sidebarHover, height: 1),
 
           // Navigation Items
@@ -65,79 +93,243 @@ class _SidebarMenuState extends State<SidebarMenu> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 16),
               children: [
-                _buildMenuItem(
-                  context,
+                // Dashboard
+                _MenuItem(
                   icon: Icons.dashboard_outlined,
                   activeIcon: Icons.dashboard,
-                  label: AppStrings.dashboard,
+                  label: 'Dashboard',
                   route: '/dashboard',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
                 ),
-                _buildExpandableMenuItem(
-                  context,
+
+                // ===== CORE FEATURES =====
+                if (!widget.isCollapsed)
+                  const _SectionHeader(title: 'Core Features'),
+
+                // Vehicle Auctions
+                _ExpandableMenuItem(
                   icon: Icons.directions_car_outlined,
                   activeIcon: Icons.directions_car,
-                  label: AppStrings.vehicles,
-                  isExpanded: _isVehiclesExpanded,
-                  onToggle: () {
-                    setState(() {
-                      _isVehiclesExpanded = !_isVehiclesExpanded;
-                    });
-                  },
-                  children: [
-                    _SubMenuItem(
-                      label: 'Create Auction',
-                      route: '/vehicles/auctions/create',
-                      icon: Icons.add_circle_outline,
-                    ),
-                    _SubMenuItem(
-                      label: 'Active Auctions',
-                      route: '/vehicles/auctions/active',
-                      icon: Icons.play_circle_outline,
-                    ),
-                    _SubMenuItem(
-                      label: 'Inactive Auctions',
-                      route: '/vehicles/auctions/inactive',
-                      icon: Icons.pause_circle_outline,
-                    ),
-                    _SubMenuItem(
-                      label: 'Access Users',
-                      route: '/vehicles/auctions/access-users',
-                      icon: Icons.people_outline,
-                    ),
-                    _SubMenuItem(
-                      label: 'Highest Bids',
-                      route: '/vehicles/auctions/highest-bids',
-                      icon: Icons.trending_up,
-                    ),
+                  label: 'Vehicle Auctions',
+                  routePrefix: '/vehicle-auctions',
+                  isExpanded: _isExpanded('/vehicle-auctions'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/vehicle-auctions'),
+                  children: const [
+                    _SubMenuItemData(label: 'Create Auction', route: '/vehicle-auctions/create', icon: Icons.add_circle_outline),
+                    _SubMenuItemData(label: 'Active Auctions', route: '/vehicle-auctions/active', icon: Icons.play_circle_outline),
+                    _SubMenuItemData(label: 'Inactive Auctions', route: '/vehicle-auctions/inactive', icon: Icons.pause_circle_outline),
+                    _SubMenuItemData(label: 'Upload Images', route: '/vehicle-auctions/upload-images', icon: Icons.photo_library_outlined),
+                    _SubMenuItemData(label: 'Bid Report', route: '/vehicle-auctions/bid-report', icon: Icons.assessment_outlined),
+                    _SubMenuItemData(label: 'Highest Bids', route: '/vehicle-auctions/highest-bids', icon: Icons.trending_up),
+                    _SubMenuItemData(label: 'Access Users', route: '/vehicle-auctions/access-users', icon: Icons.people_outline),
                   ],
                 ),
-                _buildMenuItem(
-                  context,
+
+                // Property Auctions
+                _ExpandableMenuItem(
                   icon: Icons.home_work_outlined,
                   activeIcon: Icons.home_work,
-                  label: AppStrings.properties,
-                  route: '/properties',
+                  label: 'Property Auctions',
+                  routePrefix: '/property-auctions',
+                  isExpanded: _isExpanded('/property-auctions'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/property-auctions'),
+                  children: const [
+                    _SubMenuItemData(label: 'Create Auction', route: '/property-auctions/create', icon: Icons.add_circle_outline),
+                    _SubMenuItemData(label: 'Active Auctions', route: '/property-auctions/active', icon: Icons.play_circle_outline),
+                    _SubMenuItemData(label: 'Inactive Auctions', route: '/property-auctions/inactive', icon: Icons.pause_circle_outline),
+                    _SubMenuItemData(label: 'User Survey List', route: '/property-auctions/user-survey', icon: Icons.poll_outlined),
+                  ],
                 ),
-                _buildMenuItem(
-                  context,
+
+                // Car Bazaar
+                _ExpandableMenuItem(
                   icon: Icons.storefront_outlined,
                   activeIcon: Icons.storefront,
-                  label: AppStrings.carBazaar,
-                  route: '/car-bazaar',
+                  label: 'Car Bazaar',
+                  routePrefix: '/car-bazaar',
+                  isExpanded: _isExpanded('/car-bazaar'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/car-bazaar'),
+                  children: const [
+                    _SubMenuItemData(label: 'All Cars', route: '/car-bazaar/all', icon: Icons.list_alt),
+                    _SubMenuItemData(label: 'Add Car', route: '/car-bazaar/add', icon: Icons.add_circle_outline),
+                  ],
                 ),
-                _buildMenuItem(
-                  context,
-                  icon: Icons.people_outline,
-                  activeIcon: Icons.people,
-                  label: AppStrings.users,
-                  route: '/users',
+
+                // ===== MANAGEMENT =====
+                if (!widget.isCollapsed)
+                  const _SectionHeader(title: 'Management'),
+
+                _MenuItem(
+                  icon: Icons.newspaper_outlined,
+                  activeIcon: Icons.newspaper,
+                  label: 'News',
+                  route: '/news',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
                 ),
-                _buildMenuItem(
-                  context,
+
+                _MenuItem(
+                  icon: Icons.view_carousel_outlined,
+                  activeIcon: Icons.view_carousel,
+                  label: 'Banner Management',
+                  route: '/banners',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                _MenuItem(
+                  icon: Icons.verified_user_outlined,
+                  activeIcon: Icons.verified_user,
+                  label: 'KYC Document',
+                  route: '/kyc-documents',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                _MenuItem(
+                  icon: Icons.support_agent_outlined,
+                  activeIcon: Icons.support_agent,
+                  label: 'Agents',
+                  route: '/agents',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                // Bids Section
+                _ExpandableMenuItem(
+                  icon: Icons.gavel_outlined,
+                  activeIcon: Icons.gavel,
+                  label: 'Bids',
+                  routePrefix: '/bids',
+                  isExpanded: _isExpanded('/bids'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/bids'),
+                  children: const [
+                    _SubMenuItemData(label: 'Vehicle Bids', route: '/bids/vehicle', icon: Icons.directions_car_outlined),
+                    _SubMenuItemData(label: 'Property Bids', route: '/bids/property', icon: Icons.home_outlined),
+                  ],
+                ),
+
+                _MenuItem(
+                  icon: Icons.share_outlined,
+                  activeIcon: Icons.share,
+                  label: 'Referral Link',
+                  route: '/referral-link',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                _MenuItem(
+                  icon: Icons.lightbulb_outlined,
+                  activeIcon: Icons.lightbulb,
+                  label: 'Suggestion Box',
+                  route: '/suggestion-box',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                _MenuItem(
+                  icon: Icons.category_outlined,
+                  activeIcon: Icons.category,
+                  label: 'Category',
+                  route: '/category',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                // ===== USERS & ANALYTICS =====
+                if (!widget.isCollapsed)
+                  const _SectionHeader(title: 'Users & Analytics'),
+
+                _ExpandableMenuItem(
+                  icon: Icons.people_alt_outlined,
+                  activeIcon: Icons.people_alt,
+                  label: 'User Management',
+                  routePrefix: '/users',
+                  isExpanded: _isExpanded('/users'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/users'),
+                  children: const [
+                    _SubMenuItemData(label: 'Manage Users', route: '/users/manage', icon: Icons.manage_accounts_outlined),
+                    _SubMenuItemData(label: 'Expired Profiles', route: '/users/expired-profiles', icon: Icons.person_off_outlined),
+                  ],
+                ),
+
+                _ExpandableMenuItem(
+                  icon: Icons.analytics_outlined,
+                  activeIcon: Icons.analytics,
+                  label: 'Analytics',
+                  routePrefix: '/analytics',
+                  isExpanded: _isExpanded('/analytics'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/analytics'),
+                  children: const [
+                    _SubMenuItemData(label: 'User Analytics', route: '/analytics/users', icon: Icons.person_search_outlined),
+                    _SubMenuItemData(label: 'EMD Analytics', route: '/analytics/emd', icon: Icons.account_balance_wallet_outlined),
+                  ],
+                ),
+
+                _MenuItem(
+                  icon: Icons.article_outlined,
+                  activeIcon: Icons.article,
+                  label: 'Blog Section',
+                  route: '/blog',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                // ===== ADMINISTRATION =====
+                if (!widget.isCollapsed)
+                  const _SectionHeader(title: 'Administration'),
+
+                _ExpandableMenuItem(
+                  icon: Icons.admin_panel_settings_outlined,
+                  activeIcon: Icons.admin_panel_settings,
+                  label: 'Staff Management',
+                  routePrefix: '/staff',
+                  isExpanded: _isExpanded('/staff'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/staff'),
+                  children: const [
+                    _SubMenuItemData(label: 'Role Management', route: '/staff/roles', icon: Icons.security_outlined),
+                    _SubMenuItemData(label: 'Staff Members', route: '/staff/members', icon: Icons.badge_outlined),
+                  ],
+                ),
+
+                _MenuItem(
+                  icon: Icons.chat_outlined,
+                  activeIcon: Icons.chat,
+                  label: 'WhatsApp Promotion',
+                  route: '/whatsapp-promotion',
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                ),
+
+                _ExpandableMenuItem(
                   icon: Icons.settings_outlined,
                   activeIcon: Icons.settings,
-                  label: AppStrings.appConfig,
-                  route: '/app-config',
+                  label: 'Settings',
+                  routePrefix: '/settings',
+                  isExpanded: _isExpanded('/settings'),
+                  currentRoute: widget.currentRoute,
+                  isCollapsed: widget.isCollapsed,
+                  onToggle: () => _toggleMenu('/settings'),
+                  children: const [
+                    _SubMenuItemData(label: 'Page Settings', route: '/settings/pages', icon: Icons.web_outlined),
+                    _SubMenuItemData(label: 'Social Settings', route: '/settings/social', icon: Icons.public_outlined),
+                    _SubMenuItemData(label: 'General Settings', route: '/settings/general', icon: Icons.tune_outlined),
+                  ],
                 ),
               ],
             ),
@@ -145,14 +337,31 @@ class _SidebarMenuState extends State<SidebarMenu> {
 
           // Logout Section
           const Divider(color: AppColors.sidebarHover, height: 1),
-          _buildLogoutButton(context),
+          _LogoutButton(isCollapsed: widget.isCollapsed),
           const SizedBox(height: 16),
         ],
       ),
     );
   }
+}
 
-  Widget _buildCollapsedLogo() {
+// ===== EXTRACTED WIDGETS FOR BETTER PERFORMANCE =====
+
+/// Sidebar logo widget - extracted for const optimization
+class _SidebarLogo extends StatelessWidget {
+  final bool isCollapsed;
+
+  const _SidebarLogo({required this.isCollapsed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(isCollapsed ? 16 : 20),
+      child: isCollapsed ? _buildCollapsed() : _buildExpanded(),
+    );
+  }
+
+  Widget _buildCollapsed() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Image.asset(
@@ -164,7 +373,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
     );
   }
 
-  Widget _buildExpandedLogo() {
+  Widget _buildExpanded() {
     return Row(
       children: [
         ClipRRect(
@@ -202,23 +411,60 @@ class _SidebarMenuState extends State<SidebarMenu> {
       ],
     );
   }
+}
 
-  Widget _buildMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required String route,
-  }) {
-    final isActive = widget.currentRoute == route;
+/// Section header widget
+class _SectionHeader extends StatelessWidget {
+  final String title;
 
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 12, top: 16, bottom: 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          color: AppColors.sidebarTextMuted.withValues(alpha: 0.7),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Single menu item widget
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final String route;
+  final String currentRoute;
+  final bool isCollapsed;
+
+  const _MenuItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.route,
+    required this.currentRoute,
+    required this.isCollapsed,
+  });
+
+  bool get isActive => currentRoute == route || currentRoute.startsWith('$route/');
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: widget.isCollapsed ? 8 : 12,
+        horizontal: isCollapsed ? 8 : 12,
         vertical: 2,
       ),
       child: Tooltip(
-        message: widget.isCollapsed ? label : '',
+        message: isCollapsed ? label : '',
         preferBelow: false,
         child: Material(
           color: Colors.transparent,
@@ -229,7 +475,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: EdgeInsets.symmetric(
-                horizontal: widget.isCollapsed ? 12 : 16,
+                horizontal: isCollapsed ? 12 : 16,
                 vertical: 12,
               ),
               decoration: BoxDecoration(
@@ -245,26 +491,24 @@ class _SidebarMenuState extends State<SidebarMenu> {
                     : null,
               ),
               child: Row(
-                mainAxisAlignment:
-                    widget.isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                 children: [
                   Icon(
                     isActive ? activeIcon : icon,
-                    color: isActive
-                        ? AppColors.sidebarActive
-                        : AppColors.sidebarTextMuted,
+                    color: isActive ? AppColors.sidebarActive : AppColors.sidebarTextMuted,
                     size: 22,
                   ),
-                  if (!widget.isCollapsed) ...[
+                  if (!isCollapsed) ...[
                     const SizedBox(width: 12),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: isActive
-                            ? AppColors.sidebarText
-                            : AppColors.sidebarTextMuted,
-                        fontSize: 14,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: isActive ? AppColors.sidebarText : AppColors.sidebarTextMuted,
+                          fontSize: 14,
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -276,43 +520,71 @@ class _SidebarMenuState extends State<SidebarMenu> {
       ),
     );
   }
+}
 
-  Widget _buildExpandableMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required bool isExpanded,
-    required VoidCallback onToggle,
-    required List<_SubMenuItem> children,
-  }) {
-    // Check if parent is active (any vehicle route)
-    final isParentActive = widget.currentRoute.startsWith('/vehicles');
+/// Data class for submenu items - immutable for const usage
+class _SubMenuItemData {
+  final String label;
+  final String route;
+  final IconData icon;
 
+  const _SubMenuItemData({
+    required this.label,
+    required this.route,
+    required this.icon,
+  });
+}
+
+/// Expandable menu item widget
+class _ExpandableMenuItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final String routePrefix;
+  final bool isExpanded;
+  final String currentRoute;
+  final bool isCollapsed;
+  final VoidCallback onToggle;
+  final List<_SubMenuItemData> children;
+
+  const _ExpandableMenuItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.routePrefix,
+    required this.isExpanded,
+    required this.currentRoute,
+    required this.isCollapsed,
+    required this.onToggle,
+    required this.children,
+  });
+
+  bool get isParentActive => currentRoute.startsWith(routePrefix);
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Parent Item
         Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: widget.isCollapsed ? 8 : 12,
+            horizontal: isCollapsed ? 8 : 12,
             vertical: 2,
           ),
           child: Tooltip(
-            message: widget.isCollapsed ? label : '',
+            message: isCollapsed ? label : '',
             preferBelow: false,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: widget.isCollapsed
-                    ? () => context.go('/vehicles/auctions/active')
-                    : onToggle,
+                onTap: isCollapsed ? () => context.go(children.first.route) : onToggle,
                 borderRadius: BorderRadius.circular(8),
                 hoverColor: AppColors.sidebarHover,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: EdgeInsets.symmetric(
-                    horizontal: widget.isCollapsed ? 12 : 16,
+                    horizontal: isCollapsed ? 12 : 16,
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
@@ -328,34 +600,30 @@ class _SidebarMenuState extends State<SidebarMenu> {
                         : null,
                   ),
                   child: Row(
-                    mainAxisAlignment:
-                        widget.isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                    mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                     children: [
                       Icon(
                         isParentActive ? activeIcon : icon,
-                        color: isParentActive
-                            ? AppColors.sidebarActive
-                            : AppColors.sidebarTextMuted,
+                        color: isParentActive ? AppColors.sidebarActive : AppColors.sidebarTextMuted,
                         size: 22,
                       ),
-                      if (!widget.isCollapsed) ...[
+                      if (!isCollapsed) ...[
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             label,
                             style: TextStyle(
-                              color: isParentActive
-                                  ? AppColors.sidebarText
-                                  : AppColors.sidebarTextMuted,
+                              color: isParentActive ? AppColors.sidebarText : AppColors.sidebarTextMuted,
                               fontSize: 14,
                               fontWeight: isParentActive ? FontWeight.w600 : FontWeight.normal,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         AnimatedRotation(
                           turns: isExpanded ? 0.5 : 0,
                           duration: const Duration(milliseconds: 200),
-                          child: Icon(
+                          child: const Icon(
                             Icons.keyboard_arrow_down,
                             color: AppColors.sidebarTextMuted,
                             size: 20,
@@ -371,81 +639,100 @@ class _SidebarMenuState extends State<SidebarMenu> {
         ),
 
         // Child Items
-        if (!widget.isCollapsed)
+        if (!isCollapsed)
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: Padding(
               padding: const EdgeInsets.only(left: 20),
               child: Column(
                 children: children.map((child) {
-                  final isChildActive = widget.currentRoute == child.route ||
-                      widget.currentRoute.startsWith(child.route);
+                  final isChildActive = currentRoute == child.route ||
+                      currentRoute.startsWith('${child.route}/');
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => context.go(child.route),
-                        borderRadius: BorderRadius.circular(8),
-                        hoverColor: AppColors.sidebarHover,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isChildActive
-                                ? AppColors.sidebarActive.withValues(alpha: 0.1)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                child.icon,
-                                color: isChildActive
-                                    ? AppColors.sidebarActive
-                                    : AppColors.sidebarTextMuted,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                child.label,
-                                style: TextStyle(
-                                  color: isChildActive
-                                      ? AppColors.sidebarActive
-                                      : AppColors.sidebarTextMuted,
-                                  fontSize: 13,
-                                  fontWeight:
-                                      isChildActive ? FontWeight.w600 : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  return _SubMenuItem(
+                    data: child,
+                    isActive: isChildActive,
                   );
                 }).toList(),
               ),
             ),
-            crossFadeState:
-                isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 200),
           ),
       ],
     );
   }
+}
 
-  Widget _buildLogoutButton(BuildContext context) {
+/// Sub menu item widget
+class _SubMenuItem extends StatelessWidget {
+  final _SubMenuItemData data;
+  final bool isActive;
+
+  const _SubMenuItem({
+    required this.data,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go(data.route),
+          borderRadius: BorderRadius.circular(8),
+          hoverColor: AppColors.sidebarHover,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.sidebarActive.withValues(alpha: 0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  data.icon,
+                  color: isActive ? AppColors.sidebarActive : AppColors.sidebarTextMuted,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    data.label,
+                    style: TextStyle(
+                      color: isActive ? AppColors.sidebarActive : AppColors.sidebarTextMuted,
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Logout button widget
+class _LogoutButton extends StatelessWidget {
+  final bool isCollapsed;
+
+  const _LogoutButton({required this.isCollapsed});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: widget.isCollapsed ? 8 : 12,
+        horizontal: isCollapsed ? 8 : 12,
         vertical: 8,
       ),
       child: Tooltip(
-        message: widget.isCollapsed ? 'Logout' : '',
+        message: isCollapsed ? 'Logout' : '',
         preferBelow: false,
         child: Material(
           color: Colors.transparent,
@@ -454,7 +741,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: EdgeInsets.symmetric(
-                horizontal: widget.isCollapsed ? 12 : 16,
+                horizontal: isCollapsed ? 12 : 16,
                 vertical: 14,
               ),
               decoration: BoxDecoration(
@@ -473,8 +760,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
                 ),
               ),
               child: Row(
-                mainAxisAlignment:
-                    widget.isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -488,7 +774,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
                       size: 18,
                     ),
                   ),
-                  if (!widget.isCollapsed) ...[
+                  if (!isCollapsed) ...[
                     const SizedBox(width: 12),
                     const Text(
                       'Logout',
@@ -554,7 +840,8 @@ class _SidebarMenuState extends State<SidebarMenu> {
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              context.go('/login');
+              // Properly logout via AuthBloc
+              context.read<AuthBloc>().add(const AuthLogoutRequested());
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
@@ -571,17 +858,4 @@ class _SidebarMenuState extends State<SidebarMenu> {
       ),
     );
   }
-}
-
-/// Helper class for submenu items
-class _SubMenuItem {
-  final String label;
-  final String route;
-  final IconData icon;
-
-  _SubMenuItem({
-    required this.label,
-    required this.route,
-    required this.icon,
-  });
 }

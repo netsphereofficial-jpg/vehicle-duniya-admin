@@ -3,14 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
+
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
+import 'core/di/injection.dart';
 import 'config/routes.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
-import 'features/vehicle_auction/presentation/bloc/auction_bloc.dart';
-import 'features/vehicle_auction/presentation/bloc/auction_event.dart';
-import 'features/vehicle_auction/data/repositories/auction_repository_impl.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +18,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize dependencies
+  await initDependencies();
 
   // Print clickable URL for development
   if (kDebugMode) {
@@ -48,31 +50,25 @@ class VehicleDuniyaAdminApp extends StatefulWidget {
 }
 
 class _VehicleDuniyaAdminAppState extends State<VehicleDuniyaAdminApp> {
+  // Only global BLoCs that are needed throughout the app
   late final AuthBloc _authBloc;
-  late final AuctionBloc _auctionBloc;
 
   @override
   void initState() {
     super.initState();
-    _authBloc = AuthBloc()..add(const AuthCheckRequested());
-    _auctionBloc = AuctionBloc(
-      repository: AuctionRepositoryImpl(),
-    )..add(const LoadCategoriesRequested());
-  }
-
-  @override
-  void dispose() {
-    _authBloc.close();
-    _auctionBloc.close();
-    super.dispose();
+    // Get AuthBloc from service locator and check auth status
+    _authBloc = sl<AuthBloc>()..add(const AuthCheckRequested());
   }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        // Only AuthBloc is global - needed for routing and auth state
         BlocProvider<AuthBloc>.value(value: _authBloc),
-        BlocProvider<AuctionBloc>.value(value: _auctionBloc),
+
+        // Other BLoCs (AuctionBloc, CategoryBloc, etc.) are provided
+        // at route level - see config/routes.dart
       ],
       child: MaterialApp.router(
         title: 'Vehicle Duniya Admin',

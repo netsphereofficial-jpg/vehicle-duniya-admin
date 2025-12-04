@@ -1,5 +1,7 @@
-// ignore_for_file: deprecated_member_use
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -13,7 +15,7 @@ import '../bloc/auction_event.dart';
 import '../bloc/auction_state.dart';
 import '../widgets/auction_list_item.dart';
 
-/// Page displaying active auctions (upcoming + live)
+/// Page displaying active auctions (upcoming + live) with pagination and search debounce
 class ActiveAuctionsPage extends StatefulWidget {
   const ActiveAuctionsPage({super.key});
 
@@ -25,34 +27,83 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
   String _searchQuery = '';
   AuctionStatus? _statusFilter;
 
+  // Pagination
+  static const int _pageSize = 20;
+  int _currentPage = 1;
+
+  // Search debounce
+  Timer? _searchDebounce;
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+
   @override
   void initState() {
     super.initState();
     _loadAuctions();
   }
 
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _loadAuctions() {
     context.read<AuctionBloc>().add(const LoadAuctionsRequested());
   }
 
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    setState(() => _isSearching = true);
+
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = value;
+          _currentPage = 1; // Reset to first page on search
+          _isSearching = false;
+        });
+      }
+    });
+  }
+
   List<Auction> _filterAuctions(List<Auction> auctions) {
-    var filtered = auctions.where((a) =>
-        a.status == AuctionStatus.upcoming ||
-        a.status == AuctionStatus.live).toList();
+    // Single-pass optimized filtering
+    return auctions.where((a) {
+      // Status must be active (upcoming or live)
+      if (a.status != AuctionStatus.upcoming && a.status != AuctionStatus.live) {
+        return false;
+      }
+      // Apply additional status filter
+      if (_statusFilter != null && a.status != _statusFilter) {
+        return false;
+      }
+      // Apply search filter
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        if (!a.name.toLowerCase().contains(query) &&
+            !a.categoryName.toLowerCase().contains(query)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+  }
 
-    // Apply status filter
-    if (_statusFilter != null) {
-      filtered = filtered.where((a) => a.status == _statusFilter).toList();
-    }
+  List<Auction> _paginateAuctions(List<Auction> auctions) {
+    final startIndex = (_currentPage - 1) * _pageSize;
+    if (startIndex >= auctions.length) return [];
 
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((a) =>
-          a.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          a.categoryName.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    }
+    final endIndex = startIndex + _pageSize;
+    return auctions.sublist(
+      startIndex,
+      endIndex > auctions.length ? auctions.length : endIndex,
+    );
+  }
 
-    return filtered;
+  int _getTotalPages(int totalItems) {
+    return (totalItems / _pageSize).ceil();
   }
 
   void _showDeleteConfirmation(BuildContext context, Auction auction) {
@@ -68,6 +119,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
           ),
           TextButton(
             onPressed: () {
+              HapticFeedback.mediumImpact();
               Navigator.pop(ctx);
               context.read<AuctionBloc>().add(DeleteAuctionRequested(auction.id));
             },
@@ -149,7 +201,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
             text: 'Create Auction',
             type: ButtonType.primary,
             icon: Icons.add,
-            onPressed: () => context.go('/vehicles/auctions/create'),
+            onPressed: () => context.go('/vehicle-auctions/create'),
           ),
       ],
     );
@@ -183,7 +235,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
                       text: 'Create Auction',
                       type: ButtonType.primary,
                       icon: Icons.add,
-                      onPressed: () => context.go('/vehicles/auctions/create'),
+                      onPressed: () => context.go('/vehicle-auctions/create'),
                     ),
                   ),
                 ],
@@ -203,25 +255,40 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
 
   Widget _buildSearchField() {
     return TextField(
+      controller: _searchController,
       decoration: InputDecoration(
         hintText: 'Search auctions...',
-        prefixIcon: const Icon(Icons.search),
+        prefixIcon: _isSearching
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(Icons.search),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _searchController.clear();
+                  _onSearchChanged('');
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-      onChanged: (value) {
-        setState(() {
-          _searchQuery = value;
-        });
-      },
+      onChanged: _onSearchChanged,
     );
   }
 
   Widget _buildStatusFilter() {
     return DropdownButtonFormField<AuctionStatus?>(
-      value: _statusFilter,
+      initialValue: _statusFilter,
       decoration: InputDecoration(
         hintText: 'Filter by status',
         border: OutlineInputBorder(
@@ -246,6 +313,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
       onChanged: (value) {
         setState(() {
           _statusFilter = value;
+          _currentPage = 1; // Reset to first page on filter change
         });
       },
     );
@@ -257,13 +325,14 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
       icon: const Icon(Icons.refresh),
       tooltip: 'Refresh',
       style: IconButton.styleFrom(
-        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+        backgroundColor: AppColors.primary.withAlpha(25),
         foregroundColor: AppColors.primary,
       ),
     );
   }
 
   Widget _buildContent(BuildContext context, AuctionState state, bool isMobile) {
+    // Loading state
     if (state.isLoading) {
       return const Center(
         child: Padding(
@@ -273,20 +342,55 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
       );
     }
 
-    final filteredAuctions = _filterAuctions(state.auctions);
+    // Error state with retry
+    if (state.hasError && state.auctions.isEmpty) {
+      return _buildErrorState(context, state.errorMessage ?? 'An error occurred');
+    }
 
+    final filteredAuctions = _filterAuctions(state.auctions);
+    final totalPages = _getTotalPages(filteredAuctions.length);
+    final paginatedAuctions = _paginateAuctions(filteredAuctions);
+
+    // Empty state
     if (filteredAuctions.isEmpty) {
       return _buildEmptyState(context);
     }
 
-    if (isMobile) {
-      return _buildMobileList(context, filteredAuctions);
-    }
+    return Column(
+      children: [
+        // Results count
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Showing ${paginatedAuctions.length} of ${filteredAuctions.length} auctions',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              if (totalPages > 1)
+                Text(
+                  'Page $_currentPage of $totalPages',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+            ],
+          ),
+        ),
 
-    return _buildDesktopTable(context, filteredAuctions);
+        // Content
+        if (isMobile)
+          _buildMobileList(context, paginatedAuctions)
+        else
+          _buildDesktopTable(context, paginatedAuctions),
+
+        // Pagination controls
+        if (totalPages > 1)
+          _buildPaginationControls(totalPages),
+      ],
+    );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildErrorState(BuildContext context, String error) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(48),
@@ -296,36 +400,188 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: AppColors.error.withAlpha(25),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.gavel_outlined,
+                Icons.error_outline,
                 size: 48,
-                color: AppColors.primary,
+                color: AppColors.error,
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              'No Active Auctions',
+              'Something went wrong',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Create your first auction to get started',
+              error,
               style: TextStyle(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'Create Auction',
+              text: 'Try Again',
               type: ButtonType.primary,
-              icon: Icons.add,
-              onPressed: () => context.go('/vehicles/auctions/create'),
+              icon: Icons.refresh,
+              onPressed: _loadAuctions,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final hasFilters = _searchQuery.isNotEmpty || _statusFilter != null;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withAlpha(25),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                hasFilters ? Icons.search_off : Icons.gavel_outlined,
+                size: 48,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              hasFilters ? 'No Results Found' : 'No Active Auctions',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasFilters
+                  ? 'Try adjusting your search or filters'
+                  : 'Create your first auction to get started',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            if (hasFilters)
+              CustomButton(
+                text: 'Clear Filters',
+                type: ButtonType.outline,
+                icon: Icons.clear_all,
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                    _statusFilter = null;
+                    _currentPage = 1;
+                  });
+                },
+              )
+            else
+              CustomButton(
+                text: 'Create Auction',
+                type: ButtonType.primary,
+                icon: Icons.add,
+                onPressed: () => context.go('/vehicle-auctions/create'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(int totalPages) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            onPressed: _currentPage > 1
+                ? () => setState(() => _currentPage = 1)
+                : null,
+            icon: const Icon(Icons.first_page),
+            tooltip: 'First page',
+          ),
+          IconButton(
+            onPressed: _currentPage > 1
+                ? () => setState(() => _currentPage--)
+                : null,
+            icon: const Icon(Icons.chevron_left),
+            tooltip: 'Previous page',
+          ),
+
+          // Page numbers
+          ...List.generate(
+            totalPages > 5 ? 5 : totalPages,
+            (index) {
+              int pageNum;
+              if (totalPages <= 5) {
+                pageNum = index + 1;
+              } else if (_currentPage <= 3) {
+                pageNum = index + 1;
+              } else if (_currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + index;
+              } else {
+                pageNum = _currentPage - 2 + index;
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: InkWell(
+                  onTap: () => setState(() => _currentPage = pageNum),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _currentPage == pageNum
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: _currentPage != pageNum
+                          ? Border.all(color: AppColors.border)
+                          : null,
+                    ),
+                    child: Text(
+                      '$pageNum',
+                      style: TextStyle(
+                        color: _currentPage == pageNum
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          IconButton(
+            onPressed: _currentPage < totalPages
+                ? () => setState(() => _currentPage++)
+                : null,
+            icon: const Icon(Icons.chevron_right),
+            tooltip: 'Next page',
+          ),
+          IconButton(
+            onPressed: _currentPage < totalPages
+                ? () => setState(() => _currentPage = totalPages)
+                : null,
+            icon: const Icon(Icons.last_page),
+            tooltip: 'Last page',
+          ),
+        ],
       ),
     );
   }
@@ -339,8 +595,8 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
         final auction = auctions[index];
         return AuctionListItem(
           auction: auction,
-          onTap: () => context.go('/vehicles/auctions/${auction.id}'),
-          onEdit: () => context.go('/vehicles/auctions/${auction.id}/edit'),
+          onTap: () => context.go('/vehicle-auctions/${auction.id}'),
+          onEdit: () => context.go('/vehicle-auctions/${auction.id}/edit'),
           onDelete: () => _showDeleteConfirmation(context, auction),
         );
       },
@@ -360,7 +616,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
         scrollDirection: Axis.horizontal,
         child: DataTable(
           headingRowColor: WidgetStatePropertyAll(
-            AppColors.primary.withValues(alpha: 0.05),
+            AppColors.primary.withAlpha(12),
           ),
           columns: const [
             DataColumn(label: Text('Auction Name')),
@@ -394,13 +650,13 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        onPressed: () => context.go('/vehicles/auctions/${auction.id}'),
+                        onPressed: () => context.go('/vehicle-auctions/${auction.id}'),
                         icon: const Icon(Icons.visibility_outlined),
                         iconSize: 20,
                         tooltip: 'View',
                       ),
                       IconButton(
-                        onPressed: () => context.go('/vehicles/auctions/${auction.id}/edit'),
+                        onPressed: () => context.go('/vehicle-auctions/${auction.id}/edit'),
                         icon: const Icon(Icons.edit_outlined),
                         iconSize: 20,
                         tooltip: 'Edit',
@@ -444,7 +700,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(

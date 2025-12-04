@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../../../core/utils/app_logger.dart';
 import '../../domain/entities/auction.dart';
 import '../../domain/entities/category.dart';
 import '../../domain/entities/vehicle_item.dart';
@@ -13,6 +14,7 @@ import '../models/vehicle_item_model.dart';
 
 /// Implementation of AuctionRepository using Firebase
 class AuctionRepositoryImpl implements AuctionRepository {
+  static const _tag = 'AuctionRepository';
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
 
@@ -123,8 +125,9 @@ class AuctionRepositoryImpl implements AuctionRepository {
         final data = categoryDoc.data() as Map<String, dynamic>?;
         categoryName = data?['name'] ?? '';
       }
-    } catch (_) {
-      // Ignore error, use empty category name
+    } catch (e) {
+      // Log error but continue with empty category name
+      AppLogger.warning(_tag, 'Failed to fetch category name for: $category - $e');
     }
 
     final auctionData = {
@@ -194,8 +197,9 @@ class AuctionRepositoryImpl implements AuctionRepository {
       for (final item in listResult.items) {
         await item.delete();
       }
-    } catch (_) {
-      // Ignore storage deletion errors
+    } catch (e) {
+      // Log storage deletion errors but don't fail the auction deletion
+      AppLogger.warning(_tag, 'Failed to delete auction files from storage: $id - $e');
     }
   }
 

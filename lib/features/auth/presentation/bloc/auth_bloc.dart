@@ -1,9 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/utils/app_logger.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
+  static const _tag = 'AuthBloc';
   final FirebaseAuth _firebaseAuth;
 
   AuthBloc({FirebaseAuth? firebaseAuth})
@@ -18,19 +20,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthCheckRequested event,
     Emitter<AuthState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'AuthCheckRequested');
     emit(const AuthState.loading());
 
     try {
       final user = _firebaseAuth.currentUser;
       if (user != null) {
+        AppLogger.info(_tag, 'User authenticated: ${user.email}');
         emit(AuthState.authenticated(
           userId: user.uid,
           email: user.email ?? '',
         ));
       } else {
+        AppLogger.info(_tag, 'No authenticated user found');
         emit(const AuthState.unauthenticated());
       }
     } catch (e) {
+      AppLogger.error(_tag, 'Auth check failed', e);
       emit(AuthState.error(e.toString()));
     }
   }
@@ -39,6 +45,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLoginRequested event,
     Emitter<AuthState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'AuthLoginRequested');
+    AppLogger.info(_tag, 'Login attempt for: ${event.email}');
     emit(const AuthState.loading());
 
     try {
@@ -49,14 +57,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       final user = userCredential.user;
       if (user != null) {
+        AppLogger.info(_tag, 'Login successful: ${user.email}');
         emit(AuthState.authenticated(
           userId: user.uid,
           email: user.email ?? '',
         ));
       } else {
+        AppLogger.warning(_tag, 'Login failed: No user returned');
         emit(const AuthState.error('Login failed. Please try again.'));
       }
     } on FirebaseAuthException catch (e) {
+      AppLogger.error(_tag, 'Firebase Auth error: ${e.code}', e);
       String message;
       switch (e.code) {
         case 'user-not-found':
@@ -79,6 +90,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
       emit(AuthState.error(message));
     } catch (e) {
+      AppLogger.error(_tag, 'Unexpected login error', e);
       emit(AuthState.error('An unexpected error occurred.'));
     }
   }
@@ -87,12 +99,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    AppLogger.blocEvent(_tag, 'AuthLogoutRequested');
     emit(const AuthState.loading());
 
     try {
       await _firebaseAuth.signOut();
+      AppLogger.info(_tag, 'Logout successful');
       emit(const AuthState.unauthenticated());
     } catch (e) {
+      AppLogger.error(_tag, 'Logout failed', e);
       emit(AuthState.error('Logout failed: ${e.toString()}'));
     }
   }

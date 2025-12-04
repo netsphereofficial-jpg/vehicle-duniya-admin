@@ -1,4 +1,3 @@
-// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -448,7 +447,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedCategory,
+          initialValue: _selectedCategory,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.category_outlined),
             border: OutlineInputBorder(
@@ -562,7 +561,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<AuctionMode>(
-          value: _mode,
+          initialValue: _mode,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.lan_outlined),
             border: OutlineInputBorder(
@@ -603,7 +602,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<EventType>(
-          value: _eventType,
+          initialValue: _eventType,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.business_outlined),
             border: OutlineInputBorder(
@@ -694,45 +693,27 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
           child: Row(
             children: [
               Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _zipType = ZipType.contractNo),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Radio<ZipType>(
-                          value: ZipType.contractNo,
-                          groupValue: _zipType,
-                          onChanged: (value) {
-                            if (value != null) setState(() => _zipType = value);
-                          },
-                        ),
-                        const Text('Contract No', style: TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
+                child: RadioListTile<ZipType>(
+                  value: ZipType.contractNo,
+                  groupValue: _zipType,
+                  onChanged: (value) {
+                    if (value != null) setState(() => _zipType = value);
+                  },
+                  title: const Text('Contract No', style: TextStyle(fontSize: 14)),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
                 ),
               ),
               Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _zipType = ZipType.rcNo),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Radio<ZipType>(
-                          value: ZipType.rcNo,
-                          groupValue: _zipType,
-                          onChanged: (value) {
-                            if (value != null) setState(() => _zipType = value);
-                          },
-                        ),
-                        const Text('RC No', style: TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
+                child: RadioListTile<ZipType>(
+                  value: ZipType.rcNo,
+                  groupValue: _zipType,
+                  onChanged: (value) {
+                    if (value != null) setState(() => _zipType = value);
+                  },
+                  title: const Text('RC No', style: TextStyle(fontSize: 14)),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
                 ),
               ),
             ],
