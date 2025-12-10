@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,7 +7,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/custom_text_field.dart';
 import '../../domain/entities/auction.dart';
 import '../../domain/entities/category.dart';
 import '../bloc/auction_bloc.dart';
@@ -16,7 +16,7 @@ import '../widgets/file_upload_widget.dart';
 
 /// Page for creating a new vehicle auction
 class CreateAuctionPage extends StatefulWidget {
-  final String? auctionId; // If provided, we're editing
+  final String? auctionId;
 
   const CreateAuctionPage({super.key, this.auctionId});
 
@@ -27,13 +27,10 @@ class CreateAuctionPage extends StatefulWidget {
 class _CreateAuctionPageState extends State<CreateAuctionPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _eventIdController = TextEditingController();
 
   String? _selectedCategory;
-  DateTime? _startDate;
-  TimeOfDay? _startTime;
-  DateTime? _endDate;
-  TimeOfDay? _endTime;
+  DateTime? _startDateTime;
+  DateTime? _endDateTime;
   AuctionMode _mode = AuctionMode.online;
   bool _checkBasePrice = false;
   EventType _eventType = EventType.other;
@@ -41,17 +38,15 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
 
   PlatformFile? _bidReportFile;
   PlatformFile? _imagesZipFile;
+  PlatformFile? _vehicleExcelFile;
 
   bool get _isEditing => widget.auctionId != null;
-  bool get _requiresEventId => _eventType != EventType.other;
 
   @override
   void initState() {
     super.initState();
-    // Load categories
     context.read<AuctionBloc>().add(const LoadCategoriesRequested());
 
-    // If editing, load auction details
     if (_isEditing) {
       context.read<AuctionBloc>().add(LoadAuctionDetailRequested(widget.auctionId!));
     }
@@ -60,81 +55,124 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
   @override
   void dispose() {
     _nameController.dispose();
-    _eventIdController.dispose();
     super.dispose();
   }
 
   void _populateFormFromAuction(Auction auction) {
     _nameController.text = auction.name;
-    _eventIdController.text = auction.eventId ?? '';
     _selectedCategory = auction.category;
-    _startDate = auction.startDate;
-    _startTime = TimeOfDay.fromDateTime(auction.startDate);
-    _endDate = auction.endDate;
-    _endTime = TimeOfDay.fromDateTime(auction.endDate);
+    _startDateTime = auction.startDate;
+    _endDateTime = auction.endDate;
     _mode = auction.mode;
     _checkBasePrice = auction.checkBasePrice;
     _eventType = auction.eventType;
     _zipType = auction.zipType;
   }
 
-  DateTime? _combineDateTime(DateTime? date, TimeOfDay? time) {
-    if (date == null) return null;
-    final t = time ?? const TimeOfDay(hour: 0, minute: 0);
-    return DateTime(date.year, date.month, date.day, t.hour, t.minute);
-  }
-
-  Future<void> _selectDate(BuildContext context, bool isStart) async {
+  Future<void> _selectDateTime(BuildContext ctx, bool isStart) async {
     final initialDate = isStart
-        ? (_startDate ?? DateTime.now())
-        : (_endDate ?? DateTime.now().add(const Duration(days: 7)));
+        ? (_startDateTime ?? DateTime.now())
+        : (_endDateTime ?? DateTime.now().add(const Duration(days: 7)));
 
-    final picked = await showDatePicker(
-      context: context,
+    final pickedDate = await showDatePicker(
+      context: ctx,
       initialDate: initialDate,
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
 
-    if (picked != null) {
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      // ignore: use_build_context_synchronously
+      context: ctx,
+      initialTime: TimeOfDay.fromDateTime(initialDate),
+    );
+
+    if (pickedTime != null && mounted) {
       setState(() {
+        final dateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
         if (isStart) {
-          _startDate = picked;
+          _startDateTime = dateTime;
         } else {
-          _endDate = picked;
+          _endDateTime = dateTime;
         }
       });
     }
   }
 
-  Future<void> _selectTime(BuildContext context, bool isStart) async {
-    final initialTime = isStart
-        ? (_startTime ?? TimeOfDay.now())
-        : (_endTime ?? TimeOfDay.now());
+  Future<void> _downloadSampleExcel() async {
+    try {
+      final data = await rootBundle.load('assets/samples/vehicle_import_sample.xlsx');
+      final bytes = data.buffer.asUint8List();
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-    );
+      // For web, we'll create a download
+      // For desktop, we can use path_provider
+      // For now, show a snackbar since web download requires additional setup
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sample Excel loaded (${bytes.length} bytes). Download functionality coming soon.'),
+            backgroundColor: AppColors.info,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load sample: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _startTime = picked;
-        } else {
-          _endTime = picked;
+  Future<void> _pickVehicleExcel() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'], // Only .xlsx supported, not .xls
+        withData: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        setState(() {
+          _vehicleExcelFile = file;
+        });
+
+        // Parse the Excel file
+        if (file.bytes != null && mounted) {
+          context.read<AuctionBloc>().add(ImportVehiclesFromExcel(
+            fileBytes: file.bytes!,
+            auctionId: widget.auctionId ?? 'new',
+          ));
         }
-      });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick file: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
   void _onSubmit() {
     if (!_formKey.currentState!.validate()) return;
 
-    final startDateTime = _combineDateTime(_startDate, _startTime);
-    final endDateTime = _combineDateTime(_endDate, _endTime);
-
-    if (startDateTime == null || endDateTime == null) {
+    if (_startDateTime == null || _endDateTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select start and end dates'),
@@ -144,7 +182,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
       return;
     }
 
-    if (endDateTime.isBefore(startDateTime)) {
+    if (_endDateTime!.isBefore(_startDateTime!)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('End date must be after start date'),
@@ -155,34 +193,30 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
     }
 
     if (_isEditing) {
-      // Update existing auction
       context.read<AuctionBloc>().add(UpdateAuctionRequested(
-            auctionId: widget.auctionId!,
-            updates: {
-              'name': _nameController.text.trim(),
-              'category': _selectedCategory,
-              'startDate': startDateTime,
-              'endDate': endDateTime,
-              'mode': _mode.name,
-              'checkBasePrice': _checkBasePrice,
-              'eventType': _eventType.name,
-              'eventId': _requiresEventId ? _eventIdController.text.trim() : null,
-              'zipType': _zipType.name,
-            },
-          ));
+        auctionId: widget.auctionId!,
+        updates: {
+          'name': _nameController.text.trim(),
+          'category': _selectedCategory,
+          'startDate': _startDateTime,
+          'endDate': _endDateTime,
+          'mode': _mode.name,
+          'checkBasePrice': _checkBasePrice,
+          'eventType': _eventType.name,
+          'zipType': _zipType.name,
+        },
+      ));
     } else {
-      // Create new auction
       context.read<AuctionBloc>().add(CreateAuctionRequested(
-            name: _nameController.text.trim(),
-            category: _selectedCategory!,
-            startDate: startDateTime,
-            endDate: endDateTime,
-            mode: _mode,
-            checkBasePrice: _checkBasePrice,
-            eventType: _eventType,
-            eventId: _requiresEventId ? _eventIdController.text.trim() : null,
-            zipType: _zipType,
-          ));
+        name: _nameController.text.trim(),
+        category: _selectedCategory!,
+        startDate: _startDateTime!,
+        endDate: _endDateTime!,
+        mode: _mode,
+        checkBasePrice: _checkBasePrice,
+        eventType: _eventType,
+        zipType: _zipType,
+      ));
     }
   }
 
@@ -190,13 +224,11 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuctionBloc, AuctionState>(
       listener: (context, state) {
-        // Populate form when editing
         if (_isEditing && state.selectedAuction != null && _nameController.text.isEmpty) {
           _populateFormFromAuction(state.selectedAuction!);
           setState(() {});
         }
 
-        // Handle success
         if (state.status == AuctionStateStatus.created ||
             state.status == AuctionStateStatus.updated) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -206,34 +238,41 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
             ),
           );
 
-          // Upload files if provided
           if (state.selectedAuction != null) {
             if (_bidReportFile != null && _bidReportFile!.bytes != null) {
               context.read<AuctionBloc>().add(UploadBidReportRequested(
-                    auctionId: state.selectedAuction!.id,
-                    fileBytes: _bidReportFile!.bytes!,
-                    fileName: _bidReportFile!.name,
-                  ));
+                auctionId: state.selectedAuction!.id,
+                fileBytes: _bidReportFile!.bytes!,
+                fileName: _bidReportFile!.name,
+              ));
             }
             if (_imagesZipFile != null && _imagesZipFile!.bytes != null) {
               context.read<AuctionBloc>().add(UploadImagesZipRequested(
-                    auctionId: state.selectedAuction!.id,
-                    fileBytes: _imagesZipFile!.bytes!,
-                    fileName: _imagesZipFile!.name,
-                  ));
+                auctionId: state.selectedAuction!.id,
+                fileBytes: _imagesZipFile!.bytes!,
+                fileName: _imagesZipFile!.name,
+              ));
             }
           }
 
-          // Navigate to auctions list
-          context.go('/vehicles/auctions/active');
+          context.go('/vehicle-auctions/active');
         }
 
-        // Handle error
         if (state.status == AuctionStateStatus.error && state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.errorMessage!),
               backgroundColor: AppColors.error,
+            ),
+          );
+        }
+
+        // Handle import success message
+        if (state.status == AuctionStateStatus.imported && state.hasImportedVehicles) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.successMessage ?? 'Vehicles imported!'),
+              backgroundColor: state.hasImportErrors ? AppColors.warning : AppColors.success,
             ),
           );
         }
@@ -248,9 +287,11 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
               children: [
                 _buildHeader(context),
                 const SizedBox(height: 24),
-                _buildFormCard(context, state),
+                _buildAuctionDetailsCard(context, state),
                 const SizedBox(height: 24),
-                _buildFileUploadsCard(context, state),
+                _buildFilesCard(context, state),
+                const SizedBox(height: 24),
+                _buildVehicleImportCard(context, state),
                 const SizedBox(height: 24),
                 _buildActionButtons(context, state),
               ],
@@ -273,14 +314,14 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         Text(
           _isEditing ? 'Edit Vehicle Auction' : 'Create Vehicle Auction',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildFormCard(BuildContext context, AuctionState state) {
+  Widget _buildAuctionDetailsCard(BuildContext context, AuctionState state) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -295,140 +336,99 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
             Text(
               'Auction Details',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 24),
 
             // Row 1: Auction Name + Category
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 600) {
-                  return Column(
-                    children: [
-                      _buildNameField(),
-                      const SizedBox(height: 16),
-                      _buildCategoryDropdown(state.categories),
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 2, child: _buildNameField()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildCategoryDropdown(state.categories)),
-                  ],
-                );
-              },
+            _buildResponsiveRow(
+              children: [
+                Expanded(flex: 2, child: _buildNameField()),
+                const SizedBox(width: 16),
+                Expanded(child: _buildCategoryDropdown(state.categories)),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Row 2: Start Date/Time + End Date/Time
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 600) {
-                  return Column(
-                    children: [
-                      _buildDateTimeField('Start Date & Time', true),
-                      const SizedBox(height: 16),
-                      _buildDateTimeField('End Date & Time', false),
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildDateTimeField('Start Date & Time', true)),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildDateTimeField('End Date & Time', false)),
-                  ],
-                );
-              },
+            // Row 2: Start DateTime + End DateTime
+            _buildResponsiveRow(
+              children: [
+                Expanded(child: _buildDateTimeField('Start Date & Time', true)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildDateTimeField('End Date & Time', false)),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Row 3: Mode + Event Type
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 600) {
-                  return Column(
-                    children: [
-                      _buildModeDropdown(),
-                      const SizedBox(height: 16),
-                      _buildEventTypeDropdown(),
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildModeDropdown()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildEventTypeDropdown()),
-                  ],
-                );
-              },
+            _buildResponsiveRow(
+              children: [
+                Expanded(child: _buildModeDropdown()),
+                const SizedBox(width: 16),
+                Expanded(child: _buildEventTypeDropdown()),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Row 4: Event ID (conditional)
-            if (_requiresEventId) ...[
-              CustomTextField(
-                label: 'Event ID',
-                hint: 'Enter event ID',
-                controller: _eventIdController,
-                prefixIcon: Icons.tag,
-                validator: (value) {
-                  if (_requiresEventId && (value == null || value.isEmpty)) {
-                    return 'Event ID is required for ${_eventType.displayName}';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Row 5: Check Base Price + Zip Type
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 600) {
-                  return Column(
-                    children: [
-                      _buildCheckBasePriceField(),
-                      const SizedBox(height: 16),
-                      _buildZipTypeField(),
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildCheckBasePriceField()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildZipTypeField()),
-                  ],
-                );
-              },
-            ),
+            // Row 4: Check Base Price
+            _buildCheckBasePriceField(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNameField() {
-    return CustomTextField(
-      label: 'Auction Name',
-      hint: 'Enter auction name',
-      controller: _nameController,
-      prefixIcon: Icons.gavel,
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Auction name is required';
+  Widget _buildResponsiveRow({required List<Widget> children}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return Column(
+            children: children.where((w) => w is! SizedBox).map((w) {
+              if (w is Expanded) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: w.child,
+                );
+              }
+              return w;
+            }).toList(),
+          );
         }
-        return null;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        );
       },
+    );
+  }
+
+  Widget _buildNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Text('Auction Name', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+            Text(' *', style: TextStyle(color: AppColors.error)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            hintText: 'Enter auction name',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Auction name is required';
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
 
@@ -438,10 +438,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
       children: [
         const Row(
           children: [
-            Text(
-              'Category',
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
+            Text('Category', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
             Text(' *', style: TextStyle(color: AppColors.error)),
           ],
         ),
@@ -449,10 +446,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         DropdownButtonFormField<String>(
           initialValue: _selectedCategory,
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.category_outlined),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           hint: const Text('Select category'),
@@ -479,68 +473,43 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
   }
 
   Widget _buildDateTimeField(String label, bool isStart) {
-    final date = isStart ? _startDate : _endDate;
-    final time = isStart ? _startTime : _endTime;
-    final dateFormatter = DateFormat('dd MMM yyyy');
-    final timeFormatter = DateFormat('hh:mm a');
+    final dateTime = isStart ? _startDateTime : _endDateTime;
+    final formatter = DateFormat('dd MMM yyyy, hh:mm a');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
             const Text(' *', style: TextStyle(color: AppColors.error)),
           ],
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            // Date Button
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _selectDate(context, isStart),
-                icon: const Icon(Icons.calendar_today, size: 18),
-                label: Text(
-                  date != null ? dateFormatter.format(date) : 'Select Date',
-                  style: TextStyle(
-                    color: date != null ? AppColors.textPrimary : AppColors.textSecondary,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+        InkWell(
+          onTap: () => _selectDateTime(context, isStart),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(width: 8),
-            // Time Button
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _selectTime(context, isStart),
-                icon: const Icon(Icons.access_time, size: 18),
-                label: Text(
-                  time != null
-                      ? timeFormatter.format(DateTime(2000, 1, 1, time.hour, time.minute))
-                      : 'Select Time',
-                  style: TextStyle(
-                    color: time != null ? AppColors.textPrimary : AppColors.textSecondary,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dateTime != null ? formatter.format(dateTime) : 'Select date & time',
+                    style: TextStyle(
+                      color: dateTime != null ? AppColors.textPrimary : AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+                Icon(Icons.calendar_today, size: 20, color: AppColors.textSecondary),
+              ],
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -552,10 +521,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
       children: [
         const Row(
           children: [
-            Text(
-              'Mode',
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
+            Text('Mode', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
             Text(' *', style: TextStyle(color: AppColors.error)),
           ],
         ),
@@ -563,10 +529,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         DropdownButtonFormField<AuctionMode>(
           initialValue: _mode,
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.lan_outlined),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: AuctionMode.values.map((mode) {
@@ -593,10 +556,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
       children: [
         const Row(
           children: [
-            Text(
-              'Event Type',
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
+            Text('Event Type', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
             Text(' *', style: TextStyle(color: AppColors.error)),
           ],
         ),
@@ -604,10 +564,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         DropdownButtonFormField<EventType>(
           initialValue: _eventType,
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.business_outlined),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: EventType.values.map((type) {
@@ -630,8 +587,9 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
 
   Widget _buildCheckBasePriceField() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
+        color: AppColors.background,
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -646,21 +604,19 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
             },
             activeColor: AppColors.primary,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Check Base Price',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  'Require base price for all vehicles',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                  'Require base price validation for all vehicles in this auction',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -670,60 +626,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
     );
   }
 
-  Widget _buildZipTypeField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Text(
-              'Zip Type',
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
-            Text(' *', style: TextStyle(color: AppColors.error)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: RadioListTile<ZipType>(
-                  value: ZipType.contractNo,
-                  groupValue: _zipType,
-                  onChanged: (value) {
-                    if (value != null) setState(() => _zipType = value);
-                  },
-                  title: const Text('Contract No', style: TextStyle(fontSize: 14)),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-              Expanded(
-                child: RadioListTile<ZipType>(
-                  value: ZipType.rcNo,
-                  groupValue: _zipType,
-                  onChanged: (value) {
-                    if (value != null) setState(() => _zipType = value);
-                  },
-                  title: const Text('RC No', style: TextStyle(fontSize: 14)),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFileUploadsCard(BuildContext context, AuctionState state) {
+  Widget _buildFilesCard(BuildContext context, AuctionState state) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -736,103 +639,297 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'File Uploads',
+              'Files & Upload Configuration',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Upload bid report and images (optional)',
+              'Configure zip type and upload files for this auction',
               style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 24),
 
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 600) {
-                  return Column(
+            // Zip Type Selection
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Zip Type',
+                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
                     children: [
-                      FileUploadWidget(
-                        label: 'Bid Report',
-                        hint: 'Upload PDF or Excel file',
-                        allowedExtensions: const ['pdf', 'xlsx', 'xls', 'csv'],
-                        isLoading: state.isUploading,
-                        onFileSelected: (file) {
-                          setState(() {
-                            _bidReportFile = file;
-                          });
-                        },
-                        onFileRemoved: () {
-                          setState(() {
-                            _bidReportFile = null;
-                          });
-                        },
+                      Expanded(
+                        child: _buildZipTypeOption(ZipType.contractNo, 'Contract No'),
                       ),
-                      const SizedBox(height: 16),
-                      FileUploadWidget(
-                        label: 'Images Zip',
-                        hint: 'Upload ZIP file with vehicle images',
-                        allowedExtensions: const ['zip'],
-                        isLoading: state.isUploading,
-                        onFileSelected: (file) {
-                          setState(() {
-                            _imagesZipFile = file;
-                          });
-                        },
-                        onFileRemoved: () {
-                          setState(() {
-                            _imagesZipFile = null;
-                          });
-                        },
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildZipTypeOption(ZipType.rcNo, 'RC No'),
                       ),
                     ],
-                  );
-                }
-                return Row(
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // File Uploads
+            _buildResponsiveRow(
+              children: [
+                Expanded(
+                  child: FileUploadWidget(
+                    label: 'Bid Report',
+                    hint: 'PDF or Excel file',
+                    allowedExtensions: const ['pdf', 'xlsx', 'xls', 'csv'],
+                    isLoading: state.isUploading,
+                    onFileSelected: (file) {
+                      setState(() {
+                        _bidReportFile = file;
+                      });
+                    },
+                    onFileRemoved: () {
+                      setState(() {
+                        _bidReportFile = null;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: FileUploadWidget(
+                    label: 'Images Zip',
+                    hint: 'ZIP file with vehicle images',
+                    allowedExtensions: const ['zip'],
+                    isLoading: state.isUploading,
+                    onFileSelected: (file) {
+                      setState(() {
+                        _imagesZipFile = file;
+                      });
+                    },
+                    onFileRemoved: () {
+                      setState(() {
+                        _imagesZipFile = null;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildZipTypeOption(ZipType type, String label) {
+    final isSelected = _zipType == type;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _zipType = type;
+        });
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppColors.textPrimary,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleImportCard(BuildContext context, AuctionState state) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Vehicle Data Import',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Import vehicle data from Excel spreadsheet',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _downloadSampleExcel,
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text('Download Sample'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Excel Upload Area
+            InkWell(
+              onTap: state.isImporting ? null : _pickVehicleExcel,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  border: Border.all(
+                    color: _vehicleExcelFile != null ? AppColors.success : AppColors.border,
+                    width: _vehicleExcelFile != null ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    if (state.isImporting) ...[
+                      const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Processing Excel file...'),
+                    ] else if (_vehicleExcelFile != null) ...[
+                      Icon(Icons.check_circle, size: 48, color: AppColors.success),
+                      const SizedBox(height: 12),
+                      Text(
+                        _vehicleExcelFile!.name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      if (state.hasImportedVehicles) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: state.hasImportErrors
+                                ? AppColors.warning.withValues(alpha: 0.1)
+                                : AppColors.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            state.importSummary,
+                            style: TextStyle(
+                              color: state.hasImportErrors ? AppColors.warning : AppColors.success,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _vehicleExcelFile = null;
+                          });
+                          context.read<AuctionBloc>().add(const ClearImportedVehicles());
+                        },
+                        child: const Text('Remove & Choose Another'),
+                      ),
+                    ] else ...[
+                      Icon(Icons.upload_file, size: 48, color: AppColors.textSecondary),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Click to upload Excel file',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Only .xlsx format supported (Save as Excel Workbook)',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Import Errors
+            if (state.hasImportErrors) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                ),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: FileUploadWidget(
-                        label: 'Bid Report',
-                        hint: 'Upload PDF or Excel file',
-                        allowedExtensions: const ['pdf', 'xlsx', 'xls', 'csv'],
-                        isLoading: state.isUploading,
-                        onFileSelected: (file) {
-                          setState(() {
-                            _bidReportFile = file;
-                          });
-                        },
-                        onFileRemoved: () {
-                          setState(() {
-                            _bidReportFile = null;
-                          });
-                        },
-                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.warning_amber, size: 20, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Import Errors (${state.importErrors.length})',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: FileUploadWidget(
-                        label: 'Images Zip',
-                        hint: 'Upload ZIP file with vehicle images',
-                        allowedExtensions: const ['zip'],
-                        isLoading: state.isUploading,
-                        onFileSelected: (file) {
-                          setState(() {
-                            _imagesZipFile = file;
-                          });
-                        },
-                        onFileRemoved: () {
-                          setState(() {
-                            _imagesZipFile = null;
-                          });
-                        },
+                    const SizedBox(height: 8),
+                    ...state.importErrors.take(5).map((error) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• $error',
+                        style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
                       ),
-                    ),
+                    )),
+                    if (state.importErrors.length > 5)
+                      Text(
+                        '... and ${state.importErrors.length - 5} more errors',
+                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
                   ],
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

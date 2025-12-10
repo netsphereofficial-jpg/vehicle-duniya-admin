@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/auction.dart';
 import '../../domain/entities/vehicle_item.dart';
@@ -219,4 +220,25 @@ class SelectAuction extends AuctionEvent {
 
   @override
   List<Object?> get props => [auction];
+}
+
+// ============ Excel Import Events ============
+
+/// Import vehicles from Excel file
+class ImportVehiclesFromExcel extends AuctionEvent {
+  final Uint8List fileBytes;
+  final String auctionId;
+
+  const ImportVehiclesFromExcel({
+    required this.fileBytes,
+    required this.auctionId,
+  });
+
+  @override
+  List<Object?> get props => [auctionId];
+}
+
+/// Clear imported vehicles (reset import state)
+class ClearImportedVehicles extends AuctionEvent {
+  const ClearImportedVehicles();
 }

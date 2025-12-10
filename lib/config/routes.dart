@@ -14,6 +14,7 @@ import '../features/dashboard/presentation/pages/dashboard_shell.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_event.dart' as auction_events;
 import '../features/vehicle_auction/presentation/pages/active_auctions_page.dart';
+import '../features/vehicle_auction/presentation/pages/auction_detail_page.dart';
 import '../features/vehicle_auction/presentation/pages/create_auction_page.dart';
 import '../features/vehicle_auction/presentation/pages/inactive_auctions_page.dart';
 
@@ -199,11 +200,7 @@ class AppRoutes {
                   name: 'vehicle-auction-detail',
                   builder: (context, state) {
                     final auctionId = state.pathParameters['id']!;
-                    return _ComingSoonPage(
-                      title: 'Auction Details',
-                      description: 'Viewing auction: $auctionId',
-                      icon: Icons.info_outline,
-                    );
+                    return AuctionDetailPage(auctionId: auctionId);
                   },
                 ),
                 GoRoute(

@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/utils/app_logger.dart';
+import '../../data/services/vehicle_excel_import_service.dart';
 import '../../domain/repositories/auction_repository.dart';
 import 'auction_event.dart';
 import 'auction_state.dart';
@@ -43,6 +44,10 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     on<ClearAuctionError>(_onClearError);
     on<ResetAuctionState>(_onResetState);
     on<SelectAuction>(_onSelectAuction);
+
+    // Excel import events
+    on<ImportVehiclesFromExcel>(_onImportVehiclesFromExcel);
+    on<ClearImportedVehicles>(_onClearImportedVehicles);
   }
 
   // ============ Category Handlers ============
@@ -461,5 +466,65 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     } else {
       emit(state.copyWith(selectedAuction: event.auction));
     }
+  }
+
+  // ============ Excel Import Handlers ============
+
+  Future<void> _onImportVehiclesFromExcel(
+    ImportVehiclesFromExcel event,
+    Emitter<AuctionState> emit,
+  ) async {
+    AppLogger.blocEvent(_tag, 'ImportVehiclesFromExcel');
+    AppLogger.debug(_tag, 'Importing vehicles for auction: ${event.auctionId}');
+    emit(state.copyWith(
+      status: AuctionStateStatus.importing,
+      clearImportedVehicles: true,
+      importErrors: [],
+    ));
+
+    try {
+      final result = VehicleExcelImportService.parseExcelFile(
+        event.fileBytes,
+        event.auctionId,
+      );
+
+      AppLogger.info(
+        _tag,
+        'Import result: ${result.successfulRows}/${result.totalRows} vehicles',
+      );
+
+      if (result.errors.isNotEmpty) {
+        AppLogger.warning(_tag, 'Import errors: ${result.errors.length}');
+      }
+
+      emit(state.copyWith(
+        status: AuctionStateStatus.imported,
+        importedVehicles: result.vehicles,
+        importErrors: result.errors,
+        importTotalRows: result.totalRows,
+        importSuccessfulRows: result.successfulRows,
+        successMessage: result.isSuccess
+            ? '${result.successfulRows} vehicles imported successfully!'
+            : '${result.successfulRows}/${result.totalRows} vehicles imported with ${result.errors.length} errors',
+      ));
+    } catch (e) {
+      AppLogger.error(_tag, 'Failed to import vehicles', e);
+      emit(state.copyWith(
+        status: AuctionStateStatus.error,
+        errorMessage: 'Failed to import vehicles: ${e.toString()}',
+      ));
+    }
+  }
+
+  void _onClearImportedVehicles(
+    ClearImportedVehicles event,
+    Emitter<AuctionState> emit,
+  ) {
+    emit(state.copyWith(
+      clearImportedVehicles: true,
+      importErrors: [],
+      importTotalRows: 0,
+      importSuccessfulRows: 0,
+    ));
   }
 }

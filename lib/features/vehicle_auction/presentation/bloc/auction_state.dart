@@ -16,6 +16,8 @@ enum AuctionStateStatus {
   deleted,
   uploading,
   uploaded,
+  importing,
+  imported,
   error,
 }
 
@@ -31,6 +33,12 @@ class AuctionState extends Equatable {
   final double uploadProgress;
   final AuctionStatus? currentFilter;
 
+  // Excel import related
+  final List<VehicleItem> importedVehicles;
+  final List<String> importErrors;
+  final int importTotalRows;
+  final int importSuccessfulRows;
+
   const AuctionState({
     this.status = AuctionStateStatus.initial,
     this.categories = const [],
@@ -41,6 +49,10 @@ class AuctionState extends Equatable {
     this.successMessage,
     this.uploadProgress = 0,
     this.currentFilter,
+    this.importedVehicles = const [],
+    this.importErrors = const [],
+    this.importTotalRows = 0,
+    this.importSuccessfulRows = 0,
   });
 
   /// Initial state
@@ -65,6 +77,11 @@ class AuctionState extends Equatable {
     double? uploadProgress,
     AuctionStatus? currentFilter,
     bool clearFilter = false,
+    List<VehicleItem>? importedVehicles,
+    bool clearImportedVehicles = false,
+    List<String>? importErrors,
+    int? importTotalRows,
+    int? importSuccessfulRows,
   }) {
     return AuctionState(
       status: status ?? this.status,
@@ -76,6 +93,10 @@ class AuctionState extends Equatable {
       successMessage: clearSuccess ? null : (successMessage ?? this.successMessage),
       uploadProgress: uploadProgress ?? this.uploadProgress,
       currentFilter: clearFilter ? null : (currentFilter ?? this.currentFilter),
+      importedVehicles: clearImportedVehicles ? const [] : (importedVehicles ?? this.importedVehicles),
+      importErrors: importErrors ?? this.importErrors,
+      importTotalRows: importTotalRows ?? this.importTotalRows,
+      importSuccessfulRows: importSuccessfulRows ?? this.importSuccessfulRows,
     );
   }
 
@@ -95,6 +116,18 @@ class AuctionState extends Equatable {
 
   /// Check if currently uploading
   bool get isUploading => status == AuctionStateStatus.uploading;
+
+  /// Check if currently importing
+  bool get isImporting => status == AuctionStateStatus.importing;
+
+  /// Check if import has errors
+  bool get hasImportErrors => importErrors.isNotEmpty;
+
+  /// Check if vehicles have been imported
+  bool get hasImportedVehicles => importedVehicles.isNotEmpty;
+
+  /// Get import count summary
+  String get importSummary => '$importSuccessfulRows of $importTotalRows vehicles imported';
 
   /// Check if there's an error
   bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
@@ -154,6 +187,10 @@ class AuctionState extends Equatable {
         successMessage,
         uploadProgress,
         currentFilter,
+        importedVehicles,
+        importErrors,
+        importTotalRows,
+        importSuccessfulRows,
       ];
 
   @override
