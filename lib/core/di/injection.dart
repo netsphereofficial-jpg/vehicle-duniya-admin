@@ -14,6 +14,9 @@ import '../../features/settings/presentation/bloc/settings_bloc.dart';
 import '../../features/staff/data/repositories/staff_repository_impl.dart';
 import '../../features/staff/domain/repositories/staff_repository.dart';
 import '../../features/staff/presentation/bloc/staff_bloc.dart';
+import '../../features/referral_link/data/repositories/referral_repository_impl.dart';
+import '../../features/referral_link/domain/repositories/referral_repository.dart';
+import '../../features/referral_link/presentation/bloc/referral_bloc.dart';
 import '../../features/suggestion_box/data/repositories/suggestion_repository_impl.dart';
 import '../../features/suggestion_box/domain/repositories/suggestion_repository.dart';
 import '../../features/suggestion_box/presentation/bloc/suggestion_bloc.dart';
@@ -83,6 +86,12 @@ Future<void> initDependencies() async {
     ),
   );
 
+  sl.registerLazySingleton<ReferralRepository>(
+    () => ReferralRepositoryImpl(
+      firestore: sl<FirebaseFirestore>(),
+    ),
+  );
+
   // ============ BLoCs ============
   // Global BLoCs (singleton) - needed throughout the app
   sl.registerLazySingleton<AuthBloc>(
@@ -118,6 +127,13 @@ Future<void> initDependencies() async {
   sl.registerFactory<SuggestionBloc>(
     () => SuggestionBloc(
       repository: sl<SuggestionRepository>(),
+    ),
+  );
+
+  sl.registerFactory<ReferralBloc>(
+    () => ReferralBloc(
+      repository: sl<ReferralRepository>(),
+      auth: sl<FirebaseAuth>(),
     ),
   );
 }

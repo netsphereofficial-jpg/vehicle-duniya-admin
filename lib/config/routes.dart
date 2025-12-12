@@ -9,6 +9,8 @@ import '../features/auth/presentation/pages/login_page.dart';
 import '../features/category/presentation/bloc/category_bloc.dart';
 import '../features/category/presentation/bloc/category_event.dart' as category_events;
 import '../features/category/presentation/pages/category_page.dart';
+import '../features/referral_link/presentation/bloc/referral_bloc.dart';
+import '../features/referral_link/presentation/pages/referral_link_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_shell.dart';
 import '../features/settings/presentation/bloc/settings_bloc.dart';
@@ -332,10 +334,9 @@ class AppRoutes {
             GoRoute(
               path: referralLink,
               name: 'referral-link',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Referral Link',
-                description: 'Track app downloads via referral links',
-                icon: Icons.share,
+              builder: (context, state) => BlocProvider<ReferralBloc>(
+                create: (_) => sl<ReferralBloc>(),
+                child: const ReferralLinkPage(),
               ),
             ),
 

@@ -252,11 +252,11 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: _getAlignment(column.align),
       child: Text(
-        column.header,
+        column.header.toUpperCase(),
         style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-          color: AppColors.textSecondary,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          color: AppColors.textPrimary,
           letterSpacing: 0.5,
         ),
       ),
