@@ -57,118 +57,15 @@ class KycBloc extends Bloc<KycEvent, KycState> {
   ) async {
     emit(state.copyWith(status: KycStatus.loading));
 
-    // TODO: Remove dummy data and uncomment real subscription
-    // For testing UI - load dummy data
-    await Future.delayed(const Duration(milliseconds: 500));
-    add(KycDocumentsUpdated(_getDummyDocuments()));
-    return;
-
-    // Real subscription (commented for testing)
-    // await _documentsSubscription?.cancel();
-    // _documentsSubscription = _repository.watchKycDocuments().listen(
-    //   (documents) {
-    //     add(KycDocumentsUpdated(documents));
-    //   },
-    //   onError: (error) {
-    //     add(const KycDocumentsUpdated([]));
-    //   },
-    // );
-  }
-
-  /// Dummy data for UI testing - REMOVE IN PRODUCTION
-  List<KycDocument> _getDummyDocuments() {
-    return [
-      KycDocument(
-        id: '1',
-        userId: 'user1',
-        userName: 'Rajesh Kumar',
-        userPhone: '9876543210',
-        userAddress: '123, MG Road, Bangalore, Karnataka - 560001',
-        aadhaarNumber: '234567891234',
-        aadhaarFrontUrl: 'https://picsum.photos/seed/aadhaar1f/400/250',
-        aadhaarBackUrl: 'https://picsum.photos/seed/aadhaar1b/400/250',
-        panNumber: 'ABCDE1234F',
-        panFrontUrl: 'https://picsum.photos/seed/pan1f/400/250',
-        panBackUrl: null,
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      KycDocument(
-        id: '2',
-        userId: 'user2',
-        userName: 'Priya Sharma',
-        userPhone: '9123456789',
-        userAddress: '456, Park Street, Kolkata, West Bengal - 700016',
-        aadhaarNumber: '876543219876',
-        aadhaarFrontUrl: 'https://picsum.photos/seed/aadhaar2f/400/250',
-        aadhaarBackUrl: 'https://picsum.photos/seed/aadhaar2b/400/250',
-        panNumber: 'FGHIJ5678K',
-        panFrontUrl: 'https://picsum.photos/seed/pan2f/400/250',
-        panBackUrl: 'https://picsum.photos/seed/pan2b/400/250',
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-      KycDocument(
-        id: '3',
-        userId: 'user3',
-        userName: 'Amit Patel',
-        userPhone: '8765432109',
-        userAddress: '789, SG Highway, Ahmedabad, Gujarat - 380015',
-        aadhaarNumber: '543216789012',
-        aadhaarFrontUrl: 'https://picsum.photos/seed/aadhaar3f/400/250',
-        aadhaarBackUrl: null,
-        panNumber: null,
-        panFrontUrl: null,
-        panBackUrl: null,
-        createdAt: DateTime.now().subtract(const Duration(days: 7)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      KycDocument(
-        id: '4',
-        userId: 'user4',
-        userName: 'Sneha Reddy',
-        userPhone: '7654321098',
-        userAddress: '321, Jubilee Hills, Hyderabad, Telangana - 500033',
-        aadhaarNumber: null,
-        aadhaarFrontUrl: null,
-        aadhaarBackUrl: null,
-        panNumber: 'KLMNO9012P',
-        panFrontUrl: 'https://picsum.photos/seed/pan4f/400/250',
-        panBackUrl: 'https://picsum.photos/seed/pan4b/400/250',
-        createdAt: DateTime.now().subtract(const Duration(days: 10)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 10)),
-      ),
-      KycDocument(
-        id: '5',
-        userId: 'user5',
-        userName: 'Vikram Singh',
-        userPhone: '6543210987',
-        userAddress: '654, Civil Lines, Jaipur, Rajasthan - 302006',
-        aadhaarNumber: '123498765432',
-        aadhaarFrontUrl: 'https://picsum.photos/seed/aadhaar5f/400/250',
-        aadhaarBackUrl: 'https://picsum.photos/seed/aadhaar5b/400/250',
-        panNumber: 'PQRST3456U',
-        panFrontUrl: 'https://picsum.photos/seed/pan5f/400/250',
-        panBackUrl: null,
-        createdAt: DateTime.now().subtract(const Duration(days: 15)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 15)),
-      ),
-      KycDocument(
-        id: '6',
-        userId: 'user6',
-        userName: 'Ananya Iyer',
-        userPhone: '5432109876',
-        userAddress: '987, T Nagar, Chennai, Tamil Nadu - 600017',
-        aadhaarNumber: '987612345678',
-        aadhaarFrontUrl: 'https://picsum.photos/seed/aadhaar6f/400/250',
-        aadhaarBackUrl: 'https://picsum.photos/seed/aadhaar6b/400/250',
-        panNumber: 'UVWXY7890Z',
-        panFrontUrl: 'https://picsum.photos/seed/pan6f/400/250',
-        panBackUrl: 'https://picsum.photos/seed/pan6b/400/250',
-        createdAt: DateTime.now().subtract(const Duration(days: 20)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 20)),
-      ),
-    ];
+    await _documentsSubscription?.cancel();
+    _documentsSubscription = _repository.watchKycDocuments().listen(
+      (documents) {
+        add(KycDocumentsUpdated(documents));
+      },
+      onError: (error) {
+        add(const KycDocumentsUpdated([]));
+      },
+    );
   }
 
   void _onDocumentsUpdated(
