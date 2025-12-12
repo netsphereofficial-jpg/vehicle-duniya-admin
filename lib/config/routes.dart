@@ -11,6 +11,8 @@ import '../features/category/presentation/bloc/category_event.dart' as category_
 import '../features/category/presentation/pages/category_page.dart';
 import '../features/referral_link/presentation/bloc/referral_bloc.dart';
 import '../features/referral_link/presentation/pages/referral_link_page.dart';
+import '../features/kyc_documents/presentation/bloc/kyc_bloc.dart';
+import '../features/kyc_documents/presentation/pages/kyc_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_shell.dart';
 import '../features/settings/presentation/bloc/settings_bloc.dart';
@@ -299,10 +301,9 @@ class AppRoutes {
             GoRoute(
               path: kycDocuments,
               name: 'kyc-documents',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'KYC Documents',
-                description: 'Review and verify user KYC documents',
-                icon: Icons.verified_user,
+              builder: (context, state) => BlocProvider<KycBloc>(
+                create: (_) => sl<KycBloc>(),
+                child: const KycPage(),
               ),
             ),
 
