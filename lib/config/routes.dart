@@ -14,6 +14,8 @@ import '../features/dashboard/presentation/pages/dashboard_shell.dart';
 import '../features/settings/presentation/bloc/settings_bloc.dart';
 import '../features/settings/presentation/bloc/settings_event.dart' as settings_events;
 import '../features/settings/presentation/pages/general_settings_page.dart';
+import '../features/staff/presentation/bloc/staff_bloc.dart';
+import '../features/staff/presentation/pages/staff_management_page.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_event.dart' as auction_events;
 import '../features/vehicle_auction/presentation/pages/active_auctions_page.dart';
@@ -433,28 +435,30 @@ class AppRoutes {
               ),
             ),
 
-            // ===== ADMINISTRATION =====
-            GoRoute(
-              path: staff,
-              redirect: (context, state) => staffMembers,
-            ),
-            GoRoute(
-              path: staffRoles,
-              name: 'staff-roles',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Role Management',
-                description: 'Manage staff roles and permissions',
-                icon: Icons.security,
-              ),
-            ),
-            GoRoute(
-              path: staffMembers,
-              name: 'staff-members',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Staff Members',
-                description: 'View and manage staff accounts',
-                icon: Icons.badge,
-              ),
+            // ===== ADMINISTRATION (with shared StaffBloc) =====
+            ShellRoute(
+              builder: (context, state, child) {
+                return BlocProvider<StaffBloc>(
+                  create: (_) => sl<StaffBloc>(),
+                  child: child,
+                );
+              },
+              routes: [
+                GoRoute(
+                  path: staff,
+                  redirect: (context, state) => staffMembers,
+                ),
+                GoRoute(
+                  path: staffRoles,
+                  name: 'staff-roles',
+                  builder: (context, state) => const StaffManagementPage(initialTab: 1),
+                ),
+                GoRoute(
+                  path: staffMembers,
+                  name: 'staff-members',
+                  builder: (context, state) => const StaffManagementPage(initialTab: 0),
+                ),
+              ],
             ),
 
             GoRoute(

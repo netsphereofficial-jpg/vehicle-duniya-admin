@@ -38,7 +38,7 @@ class AppColors {
   // Sidebar Colors
   static const Color sidebarBackground = Color(0xFF1E3A5F);
   static const Color sidebarText = Color(0xFFFFFFFF);
-  static const Color sidebarTextMuted = Color(0xFFB0BEC5);
+  static const Color sidebarTextMuted = Colors.white;
   static const Color sidebarHover = Color(0xFF2E5A8F);
   static const Color sidebarActive = Color(0xFFFF6B35);
 

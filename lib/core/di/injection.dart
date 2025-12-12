@@ -11,10 +11,14 @@ import '../../features/category/presentation/bloc/category_bloc.dart';
 import '../../features/settings/data/repositories/settings_repository_impl.dart';
 import '../../features/settings/domain/repositories/settings_repository.dart';
 import '../../features/settings/presentation/bloc/settings_bloc.dart';
+import '../../features/staff/data/repositories/staff_repository_impl.dart';
+import '../../features/staff/domain/repositories/staff_repository.dart';
+import '../../features/staff/presentation/bloc/staff_bloc.dart';
 import '../../features/vehicle_auction/data/repositories/auction_repository_impl.dart';
 import '../../features/vehicle_auction/domain/repositories/auction_repository.dart';
 import '../../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
 import '../services/local_image_cache.dart';
+import '../services/permission_service.dart';
 
 /// Global service locator instance
 final sl = GetIt.instance;
@@ -31,6 +35,9 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<LocalImageCache>(
     () => LocalImageCache(prefs: sl<SharedPreferences>()),
   );
+
+  // Permission Service (for role-based access control)
+  sl.registerLazySingleton<PermissionService>(() => PermissionService());
 
   // Firebase services (singletons - same instance throughout app)
   sl.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
@@ -60,6 +67,13 @@ Future<void> initDependencies() async {
     ),
   );
 
+  sl.registerLazySingleton<StaffRepository>(
+    () => StaffRepositoryImpl(
+      firestore: sl<FirebaseFirestore>(),
+      auth: sl<FirebaseAuth>(),
+    ),
+  );
+
   // ============ BLoCs ============
   // Global BLoCs (singleton) - needed throughout the app
   sl.registerLazySingleton<AuthBloc>(
@@ -83,6 +97,12 @@ Future<void> initDependencies() async {
   sl.registerFactory<SettingsBloc>(
     () => SettingsBloc(
       repository: sl<SettingsRepository>(),
+    ),
+  );
+
+  sl.registerFactory<StaffBloc>(
+    () => StaffBloc(
+      repository: sl<StaffRepository>(),
     ),
   );
 }

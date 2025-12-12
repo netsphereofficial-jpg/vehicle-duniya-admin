@@ -22,7 +22,7 @@ class TableColumnDef<T> {
   });
 }
 
-/// Modern, reusable data table with search, pagination, and animations
+/// Modern, reusable data table with smart auto-pagination
 class ModernDataTable<T> extends StatefulWidget {
   final List<T> data;
   final List<TableColumnDef<T>> columns;
@@ -30,15 +30,16 @@ class ModernDataTable<T> extends StatefulWidget {
   final String? emptyMessage;
   final IconData? emptyIcon;
   final bool showSearch;
-  final bool showEntriesDropdown;
   final String? searchHint;
   final String Function(T item)? searchableText;
   final Widget? headerActions;
   final void Function(T item)? onRowTap;
   final bool enableHover;
   final double rowHeight;
-  final List<int> entriesOptions;
-  final int initialEntriesPerPage;
+  /// If true, auto-calculates rows per page based on available height
+  final bool smartPagination;
+  /// Fixed entries per page (used when smartPagination is false)
+  final int entriesPerPage;
 
   const ModernDataTable({
     super.key,
@@ -48,15 +49,14 @@ class ModernDataTable<T> extends StatefulWidget {
     this.emptyMessage,
     this.emptyIcon,
     this.showSearch = true,
-    this.showEntriesDropdown = true,
     this.searchHint = 'Search...',
     this.searchableText,
     this.headerActions,
     this.onRowTap,
     this.enableHover = true,
     this.rowHeight = 56,
-    this.entriesOptions = const [10, 25, 50, 100],
-    this.initialEntriesPerPage = 10,
+    this.smartPagination = true,
+    this.entriesPerPage = 10,
   });
 
   @override
@@ -66,20 +66,28 @@ class ModernDataTable<T> extends StatefulWidget {
 class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  late int _entriesPerPage;
   int _currentPage = 0;
   int? _hoveredRowIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _entriesPerPage = widget.initialEntriesPerPage;
-  }
+  int _calculatedEntriesPerPage = 10;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Calculate optimal entries based on available height
+  int _calculateEntriesPerPage(double availableHeight) {
+    if (!widget.smartPagination) return widget.entriesPerPage;
+
+    // Account for header row (48px) and some padding
+    const headerHeight = 48.0;
+    const padding = 16.0;
+    final usableHeight = availableHeight - headerHeight - padding;
+    final calculatedEntries = (usableHeight / widget.rowHeight).floor();
+
+    // Minimum 5 entries, maximum 50
+    return calculatedEntries.clamp(5, 50);
   }
 
   List<T> get _filteredData {
@@ -92,35 +100,50 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
     }).toList();
   }
 
-  List<T> get _paginatedData {
-    final startIndex = _currentPage * _entriesPerPage;
-    final endIndex = (startIndex + _entriesPerPage).clamp(0, _filteredData.length);
+  List<T> _getPaginatedData(int entriesPerPage) {
+    final startIndex = _currentPage * entriesPerPage;
+    final endIndex = (startIndex + entriesPerPage).clamp(0, _filteredData.length);
     if (startIndex >= _filteredData.length) return [];
     return _filteredData.sublist(startIndex, endIndex);
   }
 
-  int get _totalPages => (_filteredData.length / _entriesPerPage).ceil();
+  int _getTotalPages(int entriesPerPage) => entriesPerPage > 0
+      ? (_filteredData.length / entriesPerPage).ceil()
+      : 1;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header with search and entries
-        if (widget.showSearch || widget.showEntriesDropdown || widget.headerActions != null)
+        // Header with search
+        if (widget.showSearch || widget.headerActions != null)
           _buildHeader(),
 
-        // Table
+        // Table with smart pagination
         Expanded(
           child: widget.isLoading
               ? _buildLoadingState()
               : _filteredData.isEmpty
                   ? _buildEmptyState()
-                  : _buildTable(),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final entriesPerPage = _calculateEntriesPerPage(constraints.maxHeight);
+                        // Reset page if data changed and current page is out of bounds
+                        final totalPages = _getTotalPages(entriesPerPage);
+                        if (_currentPage >= totalPages && totalPages > 0) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            setState(() => _currentPage = totalPages - 1);
+                          });
+                        }
+                        return _buildTable(entriesPerPage);
+                      },
+                    ),
         ),
 
         // Footer with pagination
-        if (!widget.isLoading && _filteredData.isNotEmpty) _buildFooter(),
+        if (!widget.isLoading && _filteredData.isNotEmpty)
+          _buildSmartFooter(),
       ],
     );
   }
@@ -140,50 +163,10 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
           ] else
             const Spacer(),
 
-          // Entries dropdown
-          if (widget.showEntriesDropdown) ...[
-            Text(
-              'Show ',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int>(
-                  value: _entriesPerPage,
-                  isDense: true,
-                  items: widget.entriesOptions.map((e) {
-                    return DropdownMenuItem(
-                      value: e,
-                      child: Text('$e', style: const TextStyle(fontSize: 14)),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _entriesPerPage = value;
-                        _currentPage = 0;
-                      });
-                    }
-                  },
-                ),
-              ),
-            ),
-            Text(
-              ' entries',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(width: 24),
-          ],
-
           // Search
           if (widget.showSearch)
             SizedBox(
-              width: 280,
+              width: 300,
               child: TextField(
                 controller: _searchController,
                 style: const TextStyle(fontSize: 14),
@@ -207,15 +190,15 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
                   filled: true,
                   fillColor: AppColors.background,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                 ),
@@ -232,7 +215,10 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
     );
   }
 
-  Widget _buildTable() {
+  Widget _buildTable(int entriesPerPage) {
+    _calculatedEntriesPerPage = entriesPerPage;
+    final paginatedData = _getPaginatedData(entriesPerPage);
+
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -250,9 +236,9 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
           ),
 
           // Table Rows
-          ...List.generate(_paginatedData.length, (index) {
-            final item = _paginatedData[index];
-            final actualIndex = _currentPage * _entriesPerPage + index;
+          ...List.generate(paginatedData.length, (index) {
+            final item = paginatedData[index];
+            final actualIndex = _currentPage * entriesPerPage + index;
             return _buildRow(item, actualIndex, index);
           }),
         ],
@@ -413,9 +399,11 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
     );
   }
 
-  Widget _buildFooter() {
-    final startItem = _currentPage * _entriesPerPage + 1;
-    final endItem = ((_currentPage + 1) * _entriesPerPage).clamp(0, _filteredData.length);
+  Widget _buildSmartFooter() {
+    final entriesPerPage = _calculatedEntriesPerPage;
+    final totalPages = _getTotalPages(entriesPerPage);
+    final startItem = _currentPage * entriesPerPage + 1;
+    final endItem = ((_currentPage + 1) * entriesPerPage).clamp(0, _filteredData.length);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -425,174 +413,203 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
       ),
       child: Row(
         children: [
-          Text(
-            'Showing $startItem to $endItem of ${_filteredData.length} entries',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
+          // Result count with modern styling
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.list_alt, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Text(
+                  '$startItem–$endItem',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  ' of ${_filteredData.length}',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           ),
-          if (_filteredData.length != widget.data.length)
-            Text(
-              ' (filtered from ${widget.data.length} total)',
-              style: TextStyle(
-                color: AppColors.textLight,
-                fontSize: 13,
+          if (_filteredData.length != widget.data.length) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.filter_list, size: 12, color: AppColors.info),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Filtered',
+                    style: TextStyle(
+                      color: AppColors.info,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ],
           const Spacer(),
-          _buildPagination(),
+          _buildSmartPagination(totalPages),
         ],
       ),
     );
   }
 
-  Widget _buildPagination() {
-    if (_totalPages <= 1) return const SizedBox.shrink();
+  Widget _buildSmartPagination(int totalPages) {
+    if (totalPages <= 1) return const SizedBox.shrink();
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // First page button
+        if (totalPages > 3)
+          _SmartPaginationButton(
+            icon: Icons.first_page,
+            onPressed: _currentPage > 0
+                ? () => setState(() => _currentPage = 0)
+                : null,
+            tooltip: 'First page',
+          ),
+
         // Previous button
-        _PaginationButton(
+        _SmartPaginationButton(
           icon: Icons.chevron_left,
           onPressed: _currentPage > 0
               ? () => setState(() => _currentPage--)
               : null,
+          tooltip: 'Previous',
         ),
-        const SizedBox(width: 8),
-
-        // Page numbers
-        ..._buildPageNumbers(),
 
         const SizedBox(width: 8),
+
+        // Current page indicator
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.primaryLight],
+            ),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            '${_currentPage + 1} / $totalPages',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
         // Next button
-        _PaginationButton(
+        _SmartPaginationButton(
           icon: Icons.chevron_right,
-          onPressed: _currentPage < _totalPages - 1
+          onPressed: _currentPage < totalPages - 1
               ? () => setState(() => _currentPage++)
               : null,
+          tooltip: 'Next',
         ),
+
+        // Last page button
+        if (totalPages > 3)
+          _SmartPaginationButton(
+            icon: Icons.last_page,
+            onPressed: _currentPage < totalPages - 1
+                ? () => setState(() => _currentPage = totalPages - 1)
+                : null,
+            tooltip: 'Last page',
+          ),
       ],
     );
   }
-
-  List<Widget> _buildPageNumbers() {
-    final pages = <Widget>[];
-    const maxVisiblePages = 5;
-
-    int startPage = (_currentPage - maxVisiblePages ~/ 2).clamp(0, _totalPages - maxVisiblePages).clamp(0, _totalPages - 1);
-    int endPage = (startPage + maxVisiblePages - 1).clamp(0, _totalPages - 1);
-
-    if (startPage > 0) {
-      pages.add(_PageNumber(page: 0, isSelected: _currentPage == 0, onTap: () => setState(() => _currentPage = 0)));
-      if (startPage > 1) {
-        pages.add(const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Text('...'),
-        ));
-      }
-    }
-
-    for (int i = startPage; i <= endPage; i++) {
-      pages.add(_PageNumber(
-        page: i,
-        isSelected: _currentPage == i,
-        onTap: () => setState(() => _currentPage = i),
-      ));
-    }
-
-    if (endPage < _totalPages - 1) {
-      if (endPage < _totalPages - 2) {
-        pages.add(const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Text('...'),
-        ));
-      }
-      pages.add(_PageNumber(
-        page: _totalPages - 1,
-        isSelected: _currentPage == _totalPages - 1,
-        onTap: () => setState(() => _currentPage = _totalPages - 1),
-      ));
-    }
-
-    return pages;
-  }
 }
 
-class _PaginationButton extends StatelessWidget {
+/// Smart pagination button with hover effect
+class _SmartPaginationButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback? onPressed;
+  final String tooltip;
 
-  const _PaginationButton({
+  const _SmartPaginationButton({
     required this.icon,
     this.onPressed,
+    required this.tooltip,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isEnabled = onPressed != null;
-    return Material(
-      color: isEnabled ? AppColors.surface : AppColors.background,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: isEnabled ? AppColors.textPrimary : AppColors.textLight,
-          ),
-        ),
-      ),
-    );
-  }
+  State<_SmartPaginationButton> createState() => _SmartPaginationButtonState();
 }
 
-class _PageNumber extends StatelessWidget {
-  final int page;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PageNumber({
-    required this.page,
-    required this.isSelected,
-    required this.onTap,
-  });
+class _SmartPaginationButtonState extends State<_SmartPaginationButton> {
+  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Material(
-        color: isSelected ? AppColors.primary : AppColors.surface,
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
-          onTap: isSelected ? null : onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.border,
-              ),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(
-              child: Text(
-                '${page + 1}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isSelected ? Colors.white : AppColors.textPrimary,
+    final isEnabled = widget.onPressed != null;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          child: Material(
+            color: isEnabled && _isHovered
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: widget.onPressed,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isEnabled && _isHovered
+                        ? AppColors.primary.withValues(alpha: 0.5)
+                        : AppColors.border,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  widget.icon,
+                  size: 18,
+                  color: isEnabled
+                      ? (_isHovered ? AppColors.primary : AppColors.textPrimary)
+                      : AppColors.textLight,
                 ),
               ),
             ),
