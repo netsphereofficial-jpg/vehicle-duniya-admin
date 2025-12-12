@@ -11,6 +11,9 @@ import '../features/category/presentation/bloc/category_event.dart' as category_
 import '../features/category/presentation/pages/category_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_shell.dart';
+import '../features/settings/presentation/bloc/settings_bloc.dart';
+import '../features/settings/presentation/bloc/settings_event.dart' as settings_events;
+import '../features/settings/presentation/pages/general_settings_page.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_event.dart' as auction_events;
 import '../features/vehicle_auction/presentation/pages/active_auctions_page.dart';
@@ -464,36 +467,35 @@ class AppRoutes {
               ),
             ),
 
-            GoRoute(
-              path: settings,
-              redirect: (context, state) => settingsGeneral,
-            ),
-            GoRoute(
-              path: settingsPages,
-              name: 'settings-pages',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Page Settings',
-                description: 'Configure app pages and content',
-                icon: Icons.web,
-              ),
-            ),
-            GoRoute(
-              path: settingsSocial,
-              name: 'settings-social',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Social Settings',
-                description: 'Configure social media integrations',
-                icon: Icons.public,
-              ),
-            ),
-            GoRoute(
-              path: settingsGeneral,
-              name: 'settings-general',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'General Settings',
-                description: 'Configure general app settings',
-                icon: Icons.tune,
-              ),
+            // ===== SETTINGS (with shared SettingsBloc) =====
+            ShellRoute(
+              builder: (context, state, child) {
+                return BlocProvider<SettingsBloc>(
+                  create: (_) => sl<SettingsBloc>()..add(const settings_events.LoadSettingsRequested()),
+                  child: child,
+                );
+              },
+              routes: [
+                GoRoute(
+                  path: settings,
+                  redirect: (context, state) => settingsGeneral,
+                ),
+                GoRoute(
+                  path: settingsPages,
+                  name: 'settings-pages',
+                  redirect: (context, state) => settingsGeneral,
+                ),
+                GoRoute(
+                  path: settingsSocial,
+                  name: 'settings-social',
+                  redirect: (context, state) => settingsGeneral,
+                ),
+                GoRoute(
+                  path: settingsGeneral,
+                  name: 'settings-general',
+                  builder: (context, state) => const GeneralSettingsPage(),
+                ),
+              ],
             ),
           ],
         ),

@@ -2,14 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/category/data/repositories/category_repository_impl.dart';
 import '../../features/category/domain/repositories/category_repository.dart';
 import '../../features/category/presentation/bloc/category_bloc.dart';
+import '../../features/settings/data/repositories/settings_repository_impl.dart';
+import '../../features/settings/domain/repositories/settings_repository.dart';
+import '../../features/settings/presentation/bloc/settings_bloc.dart';
 import '../../features/vehicle_auction/data/repositories/auction_repository_impl.dart';
 import '../../features/vehicle_auction/domain/repositories/auction_repository.dart';
 import '../../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
+import '../services/local_image_cache.dart';
 
 /// Global service locator instance
 final sl = GetIt.instance;
@@ -18,6 +23,15 @@ final sl = GetIt.instance;
 /// Call this in main() before runApp()
 Future<void> initDependencies() async {
   // ============ External Services ============
+  // SharedPreferences (must be initialized before use)
+  final prefs = await SharedPreferences.getInstance();
+  sl.registerLazySingleton<SharedPreferences>(() => prefs);
+
+  // Local Image Cache
+  sl.registerLazySingleton<LocalImageCache>(
+    () => LocalImageCache(prefs: sl<SharedPreferences>()),
+  );
+
   // Firebase services (singletons - same instance throughout app)
   sl.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   sl.registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance);
@@ -39,6 +53,13 @@ Future<void> initDependencies() async {
     ),
   );
 
+  sl.registerLazySingleton<SettingsRepository>(
+    () => SettingsRepositoryImpl(
+      firestore: sl<FirebaseFirestore>(),
+      storage: sl<FirebaseStorage>(),
+    ),
+  );
+
   // ============ BLoCs ============
   // Global BLoCs (singleton) - needed throughout the app
   sl.registerLazySingleton<AuthBloc>(
@@ -56,6 +77,12 @@ Future<void> initDependencies() async {
   sl.registerFactory<CategoryBloc>(
     () => CategoryBloc(
       repository: sl<CategoryRepository>(),
+    ),
+  );
+
+  sl.registerFactory<SettingsBloc>(
+    () => SettingsBloc(
+      repository: sl<SettingsRepository>(),
     ),
   );
 }
