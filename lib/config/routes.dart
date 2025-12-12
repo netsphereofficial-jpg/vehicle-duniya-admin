@@ -16,6 +16,8 @@ import '../features/settings/presentation/bloc/settings_event.dart' as settings_
 import '../features/settings/presentation/pages/general_settings_page.dart';
 import '../features/staff/presentation/bloc/staff_bloc.dart';
 import '../features/staff/presentation/pages/staff_management_page.dart';
+import '../features/suggestion_box/presentation/bloc/suggestion_bloc.dart';
+import '../features/suggestion_box/presentation/pages/suggestion_box_page.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
 import '../features/vehicle_auction/presentation/bloc/auction_event.dart' as auction_events;
 import '../features/vehicle_auction/presentation/pages/active_auctions_page.dart';
@@ -54,10 +56,8 @@ class AppRoutes {
   static const String carBazaarAdd = '/car-bazaar/add';
 
   // ===== MANAGEMENT =====
-  static const String news = '/news';
   static const String banners = '/banners';
   static const String kycDocuments = '/kyc-documents';
-  static const String agents = '/agents';
 
   // Bids
   static const String bids = '/bids';
@@ -85,9 +85,8 @@ class AppRoutes {
   static const String staffRoles = '/staff/roles';
   static const String staffMembers = '/staff/members';
 
-  static const String whatsappPromotion = '/whatsapp-promotion';
-
   static const String settings = '/settings';
+  static const String settingsNewsTicker = '/settings/news-ticker';
   static const String settingsPages = '/settings/pages';
   static const String settingsSocial = '/settings/social';
   static const String settingsGeneral = '/settings/general';
@@ -287,15 +286,6 @@ class AppRoutes {
 
             // ===== MANAGEMENT =====
             GoRoute(
-              path: news,
-              name: 'news',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'News Management',
-                description: 'Create and manage news articles',
-                icon: Icons.newspaper,
-              ),
-            ),
-            GoRoute(
               path: banners,
               name: 'banners',
               builder: (context, state) => const _ComingSoonPage(
@@ -311,15 +301,6 @@ class AppRoutes {
                 title: 'KYC Documents',
                 description: 'Review and verify user KYC documents',
                 icon: Icons.verified_user,
-              ),
-            ),
-            GoRoute(
-              path: agents,
-              name: 'agents',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Agents',
-                description: 'Manage agent accounts and permissions',
-                icon: Icons.support_agent,
               ),
             ),
 
@@ -358,13 +339,13 @@ class AppRoutes {
               ),
             ),
 
+            // ===== SUGGESTION BOX (with SuggestionBloc) =====
             GoRoute(
               path: suggestionBox,
               name: 'suggestion-box',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Suggestion Box',
-                description: 'View user suggestions and feedback',
-                icon: Icons.lightbulb,
+              builder: (context, state) => BlocProvider<SuggestionBloc>(
+                create: (_) => sl<SuggestionBloc>(),
+                child: const SuggestionBoxPage(),
               ),
             ),
 
@@ -461,16 +442,6 @@ class AppRoutes {
               ],
             ),
 
-            GoRoute(
-              path: whatsappPromotion,
-              name: 'whatsapp-promotion',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'WhatsApp Promotion',
-                description: 'Manage WhatsApp marketing campaigns',
-                icon: Icons.chat,
-              ),
-            ),
-
             // ===== SETTINGS (with shared SettingsBloc) =====
             ShellRoute(
               builder: (context, state, child) {
@@ -483,6 +454,15 @@ class AppRoutes {
                 GoRoute(
                   path: settings,
                   redirect: (context, state) => settingsGeneral,
+                ),
+                GoRoute(
+                  path: settingsNewsTicker,
+                  name: 'settings-news-ticker',
+                  builder: (context, state) => const _ComingSoonPage(
+                    title: 'App News Ticker',
+                    description: 'Manage the scrolling news ticker displayed in the app',
+                    icon: Icons.rss_feed,
+                  ),
                 ),
                 GoRoute(
                   path: settingsPages,

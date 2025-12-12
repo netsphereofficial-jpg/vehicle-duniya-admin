@@ -24,10 +24,8 @@ enum AppPermission {
   carBazaarAdd,
 
   // Management
-  news,
   banners,
   kycDocuments,
-  agents,
 
   // Bids
   bidsVehicle,
@@ -53,10 +51,8 @@ enum AppPermission {
   staffRoles,
   staffMembers,
 
-  // Promotions
-  whatsappPromotion,
-
   // Settings
+  settingsNewsTicker,
   settingsPages,
   settingsSocial,
   settingsGeneral,
@@ -156,11 +152,6 @@ const Map<AppPermission, PermissionInfo> permissionInfo = {
   ),
 
   // Management
-  AppPermission.news: PermissionInfo(
-    label: 'News',
-    group: 'Management',
-    route: '/news',
-  ),
   AppPermission.banners: PermissionInfo(
     label: 'Banner Management',
     group: 'Management',
@@ -170,11 +161,6 @@ const Map<AppPermission, PermissionInfo> permissionInfo = {
     label: 'KYC Document',
     group: 'Management',
     route: '/kyc-documents',
-  ),
-  AppPermission.agents: PermissionInfo(
-    label: 'Agents',
-    group: 'Management',
-    route: '/agents',
   ),
 
   // Bids
@@ -249,14 +235,12 @@ const Map<AppPermission, PermissionInfo> permissionInfo = {
     route: '/staff/members',
   ),
 
-  // Promotions
-  AppPermission.whatsappPromotion: PermissionInfo(
-    label: 'WhatsApp Promotion',
-    group: 'Promotions',
-    route: '/whatsapp-promotion',
-  ),
-
   // Settings
+  AppPermission.settingsNewsTicker: PermissionInfo(
+    label: 'App News Ticker',
+    group: 'Settings',
+    route: '/settings/news-ticker',
+  ),
   AppPermission.settingsPages: PermissionInfo(
     label: 'Page Settings',
     group: 'Settings',
@@ -300,7 +284,6 @@ const List<String> permissionGroupOrder = [
   'Analytics',
   'Content',
   'Staff',
-  'Promotions',
   'Settings',
 ];
 

@@ -167,15 +167,6 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   const _SectionHeader(title: 'Management'),
 
                 _MenuItem(
-                  icon: Icons.newspaper_outlined,
-                  activeIcon: Icons.newspaper,
-                  label: 'News',
-                  route: '/news',
-                  currentRoute: widget.currentRoute,
-                  isCollapsed: widget.isCollapsed,
-                ),
-
-                _MenuItem(
                   icon: Icons.view_carousel_outlined,
                   activeIcon: Icons.view_carousel,
                   label: 'Banner Management',
@@ -189,15 +180,6 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   activeIcon: Icons.verified_user,
                   label: 'KYC Document',
                   route: '/kyc-documents',
-                  currentRoute: widget.currentRoute,
-                  isCollapsed: widget.isCollapsed,
-                ),
-
-                _MenuItem(
-                  icon: Icons.support_agent_outlined,
-                  activeIcon: Icons.support_agent,
-                  label: 'Agents',
-                  route: '/agents',
                   currentRoute: widget.currentRoute,
                   isCollapsed: widget.isCollapsed,
                 ),
@@ -307,15 +289,6 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   ],
                 ),
 
-                _MenuItem(
-                  icon: Icons.chat_outlined,
-                  activeIcon: Icons.chat,
-                  label: 'WhatsApp Promotion',
-                  route: '/whatsapp-promotion',
-                  currentRoute: widget.currentRoute,
-                  isCollapsed: widget.isCollapsed,
-                ),
-
                 _ExpandableMenuItem(
                   icon: Icons.settings_outlined,
                   activeIcon: Icons.settings,
@@ -326,6 +299,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   isCollapsed: widget.isCollapsed,
                   onToggle: () => _toggleMenu('/settings'),
                   children: const [
+                    _SubMenuItemData(label: 'App News Ticker', route: '/settings/news-ticker', icon: Icons.rss_feed_outlined),
                     _SubMenuItemData(label: 'Page Settings', route: '/settings/pages', icon: Icons.web_outlined),
                     _SubMenuItemData(label: 'Social Settings', route: '/settings/social', icon: Icons.public_outlined),
                     _SubMenuItemData(label: 'General Settings', route: '/settings/general', icon: Icons.tune_outlined),

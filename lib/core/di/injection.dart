@@ -14,6 +14,9 @@ import '../../features/settings/presentation/bloc/settings_bloc.dart';
 import '../../features/staff/data/repositories/staff_repository_impl.dart';
 import '../../features/staff/domain/repositories/staff_repository.dart';
 import '../../features/staff/presentation/bloc/staff_bloc.dart';
+import '../../features/suggestion_box/data/repositories/suggestion_repository_impl.dart';
+import '../../features/suggestion_box/domain/repositories/suggestion_repository.dart';
+import '../../features/suggestion_box/presentation/bloc/suggestion_bloc.dart';
 import '../../features/vehicle_auction/data/repositories/auction_repository_impl.dart';
 import '../../features/vehicle_auction/domain/repositories/auction_repository.dart';
 import '../../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
@@ -74,6 +77,12 @@ Future<void> initDependencies() async {
     ),
   );
 
+  sl.registerLazySingleton<SuggestionRepository>(
+    () => SuggestionRepositoryImpl(
+      firestore: sl<FirebaseFirestore>(),
+    ),
+  );
+
   // ============ BLoCs ============
   // Global BLoCs (singleton) - needed throughout the app
   sl.registerLazySingleton<AuthBloc>(
@@ -103,6 +112,12 @@ Future<void> initDependencies() async {
   sl.registerFactory<StaffBloc>(
     () => StaffBloc(
       repository: sl<StaffRepository>(),
+    ),
+  );
+
+  sl.registerFactory<SuggestionBloc>(
+    () => SuggestionBloc(
+      repository: sl<SuggestionRepository>(),
     ),
   );
 }
