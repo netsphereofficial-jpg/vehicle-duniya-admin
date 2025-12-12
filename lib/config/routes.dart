@@ -60,7 +60,6 @@ class AppRoutes {
   static const String carBazaarAdd = '/car-bazaar/add';
 
   // ===== MANAGEMENT =====
-  static const String banners = '/banners';
   static const String kycDocuments = '/kyc-documents';
 
   // Bids
@@ -289,15 +288,6 @@ class AppRoutes {
             ),
 
             // ===== MANAGEMENT =====
-            GoRoute(
-              path: banners,
-              name: 'banners',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Banner Management',
-                description: 'Manage promotional banners across the app',
-                icon: Icons.view_carousel,
-              ),
-            ),
             GoRoute(
               path: kycDocuments,
               name: 'kyc-documents',

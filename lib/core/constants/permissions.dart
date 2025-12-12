@@ -24,7 +24,6 @@ enum AppPermission {
   carBazaarAdd,
 
   // Management
-  banners,
   kycDocuments,
 
   // Bids
@@ -152,11 +151,6 @@ const Map<AppPermission, PermissionInfo> permissionInfo = {
   ),
 
   // Management
-  AppPermission.banners: PermissionInfo(
-    label: 'Banner Management',
-    group: 'Management',
-    route: '/banners',
-  ),
   AppPermission.kycDocuments: PermissionInfo(
     label: 'KYC Document',
     group: 'Management',

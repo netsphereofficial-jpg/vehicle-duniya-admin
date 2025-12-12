@@ -167,15 +167,6 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   const _SectionHeader(title: 'Management'),
 
                 _MenuItem(
-                  icon: Icons.view_carousel_outlined,
-                  activeIcon: Icons.view_carousel,
-                  label: 'Banner Management',
-                  route: '/banners',
-                  currentRoute: widget.currentRoute,
-                  isCollapsed: widget.isCollapsed,
-                ),
-
-                _MenuItem(
                   icon: Icons.verified_user_outlined,
                   activeIcon: Icons.verified_user,
                   label: 'KYC Document',
