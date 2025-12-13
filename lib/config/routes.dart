@@ -15,6 +15,11 @@ import '../features/kyc_documents/presentation/bloc/kyc_bloc.dart';
 import '../features/kyc_documents/presentation/pages/kyc_page.dart';
 import '../features/car_bazaar/presentation/bloc/car_bazaar_bloc.dart';
 import '../features/car_bazaar/presentation/pages/car_bazaar_page.dart';
+import '../features/property_auction/presentation/bloc/property_auction_bloc.dart';
+import '../features/property_auction/presentation/pages/active_property_auctions_page.dart';
+import '../features/property_auction/presentation/pages/create_property_auction_page.dart';
+import '../features/property_auction/presentation/pages/inactive_property_auctions_page.dart';
+import '../features/property_auction/presentation/pages/property_auction_detail_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_shell.dart';
 import '../features/settings/presentation/bloc/settings_bloc.dart';
@@ -50,11 +55,12 @@ class AppRoutes {
   static const String vehicleAuctionEdit = '/vehicle-auctions/:id/edit';
 
   // Property Auctions
-  static const String propertyAuctions = '/property-auctions';
-  static const String propertyAuctionsCreate = '/property-auctions/create';
-  static const String propertyAuctionsActive = '/property-auctions/active';
-  static const String propertyAuctionsInactive = '/property-auctions/inactive';
-  static const String propertyAuctionsUserSurvey = '/property-auctions/user-survey';
+  static const String propertyAuctions = '/property-auction';
+  static const String propertyAuctionsCreate = '/property-auction/create';
+  static const String propertyAuctionsActive = '/property-auction/active';
+  static const String propertyAuctionsInactive = '/property-auction/inactive';
+  static const String propertyAuctionDetail = '/property-auction/detail/:id';
+  static const String propertyAuctionsUserSurvey = '/property-auction/user-survey';
 
   // Car Bazaar
   static const String carBazaar = '/car-bazaar';
@@ -222,46 +228,52 @@ class AppRoutes {
               ],
             ),
 
-            // ===== PROPERTY AUCTIONS =====
-            GoRoute(
-              path: propertyAuctions,
-              redirect: (context, state) => propertyAuctionsActive,
-            ),
-            GoRoute(
-              path: propertyAuctionsCreate,
-              name: 'property-auctions-create',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Create Property Auction',
-                description: 'Create a new property auction listing',
-                icon: Icons.add_home_work,
-              ),
-            ),
-            GoRoute(
-              path: propertyAuctionsActive,
-              name: 'property-auctions-active',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Active Property Auctions',
-                description: 'View and manage active property auctions',
-                icon: Icons.home_work,
-              ),
-            ),
-            GoRoute(
-              path: propertyAuctionsInactive,
-              name: 'property-auctions-inactive',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Inactive Property Auctions',
-                description: 'View inactive and expired property auctions',
-                icon: Icons.home_work_outlined,
-              ),
-            ),
-            GoRoute(
-              path: propertyAuctionsUserSurvey,
-              name: 'property-auctions-user-survey',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'User Survey List',
-                description: 'View interested users and survey data',
-                icon: Icons.poll_outlined,
-              ),
+            // ===== PROPERTY AUCTIONS (with shared PropertyAuctionBloc) =====
+            ShellRoute(
+              builder: (context, state, child) {
+                return BlocProvider<PropertyAuctionBloc>(
+                  create: (_) => sl<PropertyAuctionBloc>(),
+                  child: child,
+                );
+              },
+              routes: [
+                GoRoute(
+                  path: propertyAuctions,
+                  redirect: (context, state) => propertyAuctionsActive,
+                ),
+                GoRoute(
+                  path: propertyAuctionsCreate,
+                  name: 'property-auction-create',
+                  builder: (context, state) => const CreatePropertyAuctionPage(),
+                ),
+                GoRoute(
+                  path: propertyAuctionsActive,
+                  name: 'property-auction-active',
+                  builder: (context, state) => const ActivePropertyAuctionsPage(),
+                ),
+                GoRoute(
+                  path: propertyAuctionsInactive,
+                  name: 'property-auction-inactive',
+                  builder: (context, state) => const InactivePropertyAuctionsPage(),
+                ),
+                GoRoute(
+                  path: propertyAuctionDetail,
+                  name: 'property-auction-detail',
+                  builder: (context, state) {
+                    final auctionId = state.pathParameters['id']!;
+                    return PropertyAuctionDetailPage(auctionId: auctionId);
+                  },
+                ),
+                GoRoute(
+                  path: propertyAuctionsUserSurvey,
+                  name: 'property-auction-user-survey',
+                  builder: (context, state) => const _ComingSoonPage(
+                    title: 'User Survey List',
+                    description: 'View interested users and survey data',
+                    icon: Icons.poll_outlined,
+                  ),
+                ),
+              ],
             ),
 
             // ===== CAR BAZAAR =====

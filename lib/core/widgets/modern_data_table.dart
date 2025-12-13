@@ -276,17 +276,19 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
       onExit: widget.enableHover ? (_) => setState(() => _hoveredRowIndex = null) : null,
       child: GestureDetector(
         onTap: widget.onRowTap != null ? () => widget.onRowTap!(item) : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: widget.rowHeight,
+        child: Container(
+          constraints: BoxConstraints(minHeight: widget.rowHeight),
           decoration: BoxDecoration(
             color: isHovered ? AppColors.primary.withValues(alpha: 0.04) : AppColors.surface,
             border: Border(bottom: BorderSide(color: AppColors.borderLight)),
           ),
-          child: Row(
-            children: widget.columns.map((col) {
-              return _buildCell(col, item, actualIndex);
-            }).toList(),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: widget.columns.map((col) {
+                return _buildCell(col, item, actualIndex);
+              }).toList(),
+            ),
           ),
         ),
       ),

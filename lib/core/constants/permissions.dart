@@ -119,22 +119,22 @@ const Map<AppPermission, PermissionInfo> permissionInfo = {
   AppPermission.propertyAuctionsCreate: PermissionInfo(
     label: 'Create Auction',
     group: 'Property Auctions',
-    route: '/property-auctions/create',
+    route: '/property-auction/create',
   ),
   AppPermission.propertyAuctionsActive: PermissionInfo(
     label: 'Active Auctions',
     group: 'Property Auctions',
-    route: '/property-auctions/active',
+    route: '/property-auction/active',
   ),
   AppPermission.propertyAuctionsInactive: PermissionInfo(
     label: 'Inactive Auctions',
     group: 'Property Auctions',
-    route: '/property-auctions/inactive',
+    route: '/property-auction/inactive',
   ),
   AppPermission.propertyAuctionsUserSurvey: PermissionInfo(
     label: 'User Survey List',
     group: 'Property Auctions',
-    route: '/property-auctions/user-survey',
+    route: '/property-auction/user-survey',
   ),
 
   // Car Bazaar

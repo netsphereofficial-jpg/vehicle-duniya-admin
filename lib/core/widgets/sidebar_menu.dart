@@ -29,7 +29,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
   // Define all expandable menu prefixes once
   static const _expandableMenuPrefixes = [
     '/vehicle-auctions',
-    '/property-auctions',
+    '/property-auction',
     '/car-bazaar',
     '/bids',
     '/users',
@@ -133,16 +133,15 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   icon: Icons.home_work_outlined,
                   activeIcon: Icons.home_work,
                   label: 'Property Auctions',
-                  routePrefix: '/property-auctions',
-                  isExpanded: _isExpanded('/property-auctions'),
+                  routePrefix: '/property-auction',
+                  isExpanded: _isExpanded('/property-auction'),
                   currentRoute: widget.currentRoute,
                   isCollapsed: widget.isCollapsed,
-                  onToggle: () => _toggleMenu('/property-auctions'),
+                  onToggle: () => _toggleMenu('/property-auction'),
                   children: const [
-                    _SubMenuItemData(label: 'Create Auction', route: '/property-auctions/create', icon: Icons.add_circle_outline),
-                    _SubMenuItemData(label: 'Active Auctions', route: '/property-auctions/active', icon: Icons.play_circle_outline),
-                    _SubMenuItemData(label: 'Inactive Auctions', route: '/property-auctions/inactive', icon: Icons.pause_circle_outline),
-                    _SubMenuItemData(label: 'User Survey List', route: '/property-auctions/user-survey', icon: Icons.poll_outlined),
+                    _SubMenuItemData(label: 'Create Auction', route: '/property-auction/create', icon: Icons.add_circle_outline),
+                    _SubMenuItemData(label: 'Active Auctions', route: '/property-auction/active', icon: Icons.play_circle_outline),
+                    _SubMenuItemData(label: 'Inactive Auctions', route: '/property-auction/inactive', icon: Icons.pause_circle_outline),
                   ],
                 ),
 

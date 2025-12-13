@@ -23,6 +23,9 @@ import '../../features/kyc_documents/presentation/bloc/kyc_bloc.dart';
 import '../../features/car_bazaar/data/repositories/car_bazaar_repository_impl.dart';
 import '../../features/car_bazaar/domain/repositories/car_bazaar_repository.dart';
 import '../../features/car_bazaar/presentation/bloc/car_bazaar_bloc.dart';
+import '../../features/property_auction/data/repositories/property_auction_repository_impl.dart';
+import '../../features/property_auction/domain/repositories/property_auction_repository.dart';
+import '../../features/property_auction/presentation/bloc/property_auction_bloc.dart';
 import '../../features/suggestion_box/data/repositories/suggestion_repository_impl.dart';
 import '../../features/suggestion_box/domain/repositories/suggestion_repository.dart';
 import '../../features/suggestion_box/presentation/bloc/suggestion_bloc.dart';
@@ -111,6 +114,12 @@ Future<void> initDependencies() async {
     ),
   );
 
+  sl.registerLazySingleton<PropertyAuctionRepository>(
+    () => PropertyAuctionRepositoryImpl(
+      firestore: sl<FirebaseFirestore>(),
+    ),
+  );
+
   // ============ BLoCs ============
   // Global BLoCs (singleton) - needed throughout the app
   sl.registerLazySingleton<AuthBloc>(
@@ -165,6 +174,13 @@ Future<void> initDependencies() async {
   sl.registerFactory<CarBazaarBloc>(
     () => CarBazaarBloc(
       repository: sl<CarBazaarRepository>(),
+      auth: sl<FirebaseAuth>(),
+    ),
+  );
+
+  sl.registerFactory<PropertyAuctionBloc>(
+    () => PropertyAuctionBloc(
+      repository: sl<PropertyAuctionRepository>(),
       auth: sl<FirebaseAuth>(),
     ),
   );
