@@ -32,6 +32,8 @@ import '../../features/suggestion_box/presentation/bloc/suggestion_bloc.dart';
 import '../../features/vehicle_auction/data/repositories/auction_repository_impl.dart';
 import '../../features/vehicle_auction/domain/repositories/auction_repository.dart';
 import '../../features/vehicle_auction/presentation/bloc/auction_bloc.dart';
+import '../../features/meta_highest_bid/data/services/meta_api_service.dart';
+import '../../features/meta_highest_bid/presentation/bloc/meta_highest_bid_bloc.dart';
 import '../services/local_image_cache.dart';
 import '../services/permission_service.dart';
 
@@ -182,6 +184,16 @@ Future<void> initDependencies() async {
     () => PropertyAuctionBloc(
       repository: sl<PropertyAuctionRepository>(),
       auth: sl<FirebaseAuth>(),
+    ),
+  );
+
+  // ============ Meta Highest Bid ============
+  sl.registerLazySingleton<MetaApiService>(() => MetaApiService());
+
+  sl.registerFactory<MetaHighestBidBloc>(
+    () => MetaHighestBidBloc(
+      firestore: sl<FirebaseFirestore>(),
+      metaApiService: sl<MetaApiService>(),
     ),
   );
 }

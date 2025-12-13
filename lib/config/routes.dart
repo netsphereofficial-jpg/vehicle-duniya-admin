@@ -35,6 +35,9 @@ import '../features/vehicle_auction/presentation/pages/active_auctions_page.dart
 import '../features/vehicle_auction/presentation/pages/auction_detail_page.dart';
 import '../features/vehicle_auction/presentation/pages/create_auction_page.dart';
 import '../features/vehicle_auction/presentation/pages/inactive_auctions_page.dart';
+import '../features/meta_highest_bid/presentation/bloc/meta_highest_bid_bloc.dart';
+import '../features/meta_highest_bid/presentation/bloc/meta_highest_bid_event.dart';
+import '../features/meta_highest_bid/presentation/pages/meta_highest_bid_page.dart';
 
 class AppRoutes {
   // Auth
@@ -203,10 +206,10 @@ class AppRoutes {
                 GoRoute(
                   path: vehicleAuctionsHighestBids,
                   name: 'vehicle-auctions-highest-bids',
-                  builder: (context, state) => const _ComingSoonPage(
-                    title: 'Highest Bids',
-                    description: 'View highest bids across all vehicle auctions',
-                    icon: Icons.trending_up,
+                  builder: (context, state) => BlocProvider<MetaHighestBidBloc>(
+                    create: (_) => sl<MetaHighestBidBloc>()
+                      ..add(const LoadMetaHighestBidsRequested()),
+                    child: const MetaHighestBidPage(),
                   ),
                 ),
                 GoRoute(

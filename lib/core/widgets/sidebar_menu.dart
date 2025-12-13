@@ -123,7 +123,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
                     _SubMenuItemData(label: 'Inactive Auctions', route: '/vehicle-auctions/inactive', icon: Icons.pause_circle_outline),
                     _SubMenuItemData(label: 'Upload Images', route: '/vehicle-auctions/upload-images', icon: Icons.photo_library_outlined),
                     _SubMenuItemData(label: 'Bid Report', route: '/vehicle-auctions/bid-report', icon: Icons.assessment_outlined),
-                    _SubMenuItemData(label: 'Highest Bids', route: '/vehicle-auctions/highest-bids', icon: Icons.trending_up),
+                    _SubMenuItemData(label: 'Meta Highest Bid', route: '/vehicle-auctions/highest-bids', icon: Icons.trending_up),
                     _SubMenuItemData(label: 'Access Users', route: '/vehicle-auctions/access-users', icon: Icons.people_outline),
                   ],
                 ),
