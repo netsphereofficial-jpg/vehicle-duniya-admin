@@ -183,12 +183,14 @@ class MetaHighestBidBloc
     int successCount = 0;
     int failCount = 0;
 
-    // Get organizers to query
+    // Get organizers to query (stored as lowercase in Firestore)
     final organizers = organizerFilter != null
         ? [organizerFilter.toLowerCase()]
         : MetaApiService.supportedOrganizers
             .map((o) => o.toLowerCase())
             .toList();
+
+    developer.log('[MetaHighestBid] Querying auctions with eventTypes: $organizers');
 
     // Build Firestore query with cursor pagination
     Query query = _firestore
@@ -206,8 +208,10 @@ class MetaHighestBidBloc
     }
 
     final auctionsSnapshot = await query.get();
+    developer.log('[MetaHighestBid] Found ${auctionsSnapshot.docs.length} auctions');
 
     if (auctionsSnapshot.docs.isEmpty) {
+      developer.log('[MetaHighestBid] No auctions found with Meta event types');
       return _FetchResult(
         bids: [],
         hasReachedMax: true,
@@ -226,9 +230,18 @@ class MetaHighestBidBloc
       final eventType =
           (auctionData['eventType'] ?? '').toString().toUpperCase();
       final eventId = auctionData['eventId']?.toString() ?? '';
+      final auctionName = auctionData['name']?.toString() ?? 'Unknown';
 
-      if (eventId.isEmpty) continue;
-      if (!MetaApiService.isMetaOrganizer(eventType)) continue;
+      developer.log('[MetaHighestBid] Processing auction: $auctionName (eventType: $eventType, eventId: $eventId)');
+
+      if (eventId.isEmpty) {
+        developer.log('[MetaHighestBid] Skipping $auctionName - no eventId');
+        continue;
+      }
+      if (!MetaApiService.isMetaOrganizer(eventType)) {
+        developer.log('[MetaHighestBid] Skipping $auctionName - eventType $eventType not a Meta organizer');
+        continue;
+      }
 
       // Get vehicles for this auction
       final vehiclesSnapshot = await _firestore
@@ -236,11 +249,16 @@ class MetaHighestBidBloc
           .where('auctionId', isEqualTo: auctionId)
           .get();
 
+      developer.log('[MetaHighestBid] Found ${vehiclesSnapshot.docs.length} vehicles for auction $auctionName');
+
       for (final vehicleDoc in vehiclesSnapshot.docs) {
         final vehicleData = vehicleDoc.data();
         final contractNo = vehicleData['contractNo']?.toString() ?? '';
 
-        if (contractNo.isEmpty) continue;
+        if (contractNo.isEmpty) {
+          developer.log('[MetaHighestBid] Skipping vehicle ${vehicleDoc.id} - no contractNo');
+          continue;
+        }
 
         vehicleRequests.add(_VehicleRequest(
           auctionId: auctionId,
@@ -257,6 +275,8 @@ class MetaHighestBidBloc
         ));
       }
     }
+
+    developer.log('[MetaHighestBid] Total vehicles to fetch bids for: ${vehicleRequests.length}');
 
     // Process API calls in parallel batches
     for (var i = 0; i < vehicleRequests.length; i += _apiBatchSize) {
@@ -281,6 +301,8 @@ class MetaHighestBidBloc
         await Future.delayed(const Duration(milliseconds: 50));
       }
     }
+
+    developer.log('[MetaHighestBid] API calls completed - success: $successCount, failed: $failCount, bids with amount: ${bids.length}');
 
     // Sort by highest bid amount descending
     bids.sort((a, b) => b.highestBidAmount.compareTo(a.highestBidAmount));

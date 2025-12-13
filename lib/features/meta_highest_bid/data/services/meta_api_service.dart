@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 
 /// Result of a highest bid API call
@@ -67,6 +68,8 @@ class MetaApiService {
       final url =
           '$_baseUrl/bid/getMaxBidAmountByEventIdAndLoanNo/$eventId/$contractNo';
 
+      developer.log('[MetaAPI] Calling: $url');
+
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -74,6 +77,9 @@ class MetaApiService {
           'auth_key': apiKey,
         },
       ).timeout(const Duration(seconds: 10));
+
+      developer.log('[MetaAPI] Response status: ${response.statusCode}');
+      developer.log('[MetaAPI] Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -84,23 +90,27 @@ class MetaApiService {
               data['amount'] ??
               data['maxBidAmount'] ??
               data['highestBidAmount']);
+          developer.log('[MetaAPI] Parsed amount: $amount');
           return MetaBidResult(
             success: true,
             amount: amount,
           );
         }
 
+        developer.log('[MetaAPI] API returned error: ${data['message']}');
         return MetaBidResult(
           success: false,
           errorMessage: data['message'] ?? 'Failed to fetch bid',
         );
       } else {
+        developer.log('[MetaAPI] Server error: ${response.statusCode}');
         return MetaBidResult(
           success: false,
           errorMessage: 'Server error: ${response.statusCode}',
         );
       }
     } catch (e) {
+      developer.log('[MetaAPI] Network error: $e');
       return MetaBidResult(
         success: false,
         errorMessage: 'Network error: $e',
