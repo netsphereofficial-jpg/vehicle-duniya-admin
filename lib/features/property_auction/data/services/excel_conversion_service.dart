@@ -3,7 +3,26 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-/// Result of Excel conversion operation
+/// Result of server-side Excel parsing
+class ServerParseResult {
+  final bool success;
+  final List<Map<String, dynamic>> data;
+  final int totalRows;
+  final int successfulRows;
+  final List<String> errors;
+  final String? errorMessage;
+
+  const ServerParseResult({
+    required this.success,
+    this.data = const [],
+    this.totalRows = 0,
+    this.successfulRows = 0,
+    this.errors = const [],
+    this.errorMessage,
+  });
+}
+
+/// Result of Excel conversion operation (legacy)
 class ExcelConversionResult {
   final bool success;
   final Uint8List? xlsxBytes;
@@ -18,14 +37,88 @@ class ExcelConversionResult {
   });
 }
 
-/// Service for converting .xls files to .xlsx using Firebase Cloud Function
+/// Service for parsing Excel files using Firebase Cloud Function
+/// This bypasses Dart's excel package issues by parsing on the server
 class ExcelConversionService {
-  // Cloud Function URL for asia-south1 region
-  static const String _functionUrl =
+  // Cloud Function URLs for asia-south1 region
+  static const String _parseUrl =
+      'https://asia-south1-vehicle-duniya-198e5.cloudfunctions.net/parseExcelFile';
+  static const String _convertUrl =
       'https://asia-south1-vehicle-duniya-198e5.cloudfunctions.net/convertXlsToXlsx';
 
-  /// Convert .xls file to .xlsx format
-  /// Returns the converted bytes or null if conversion fails
+  /// Parse Excel file on server (recommended - handles all formats properly)
+  /// Returns parsed JSON data ready for creating auctions
+  Future<ServerParseResult> parseExcelOnServer({
+    required Uint8List fileBytes,
+    required String fileName,
+  }) async {
+    try {
+      // Encode to base64
+      final base64Data = base64Encode(fileBytes);
+
+      // Call Cloud Function via HTTP
+      final response = await http.post(
+        Uri.parse(_parseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'fileBase64': base64Data,
+          'fileName': fileName,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+        if (data['success'] == true) {
+          final List<dynamic> rawData = data['data'] ?? [];
+          final List<Map<String, dynamic>> parsedData =
+              rawData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+          final List<dynamic> rawErrors = data['errors'] ?? [];
+          final List<String> errors =
+              rawErrors.map((e) => e.toString()).toList();
+
+          return ServerParseResult(
+            success: true,
+            data: parsedData,
+            totalRows: data['totalRows'] as int? ?? 0,
+            successfulRows: data['successfulRows'] as int? ?? parsedData.length,
+            errors: errors,
+          );
+        }
+
+        return ServerParseResult(
+          success: false,
+          errorMessage: data['error'] as String? ?? 'Parse failed',
+        );
+      } else {
+        // Try to parse error message from response
+        try {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          return ServerParseResult(
+            success: false,
+            errorMessage:
+                data['error'] as String? ?? 'Server error: ${response.statusCode}',
+          );
+        } catch (_) {
+          return ServerParseResult(
+            success: false,
+            errorMessage: 'Server error: ${response.statusCode}',
+          );
+        }
+      }
+    } catch (e) {
+      return ServerParseResult(
+        success: false,
+        errorMessage: 'Failed to parse Excel file: $e',
+      );
+    }
+  }
+
+  /// Convert .xls file to .xlsx format (legacy method)
+  /// Use parseExcelOnServer instead for better compatibility
   Future<ExcelConversionResult> convertXlsToXlsx({
     required Uint8List xlsBytes,
     required String fileName,
@@ -44,7 +137,7 @@ class ExcelConversionService {
 
       // Call Cloud Function via HTTP
       final response = await http.post(
-        Uri.parse(_functionUrl),
+        Uri.parse(_convertUrl),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -72,7 +165,6 @@ class ExcelConversionService {
           errorMessage: data['error'] as String? ?? 'Conversion failed',
         );
       } else {
-        // Try to parse error message from response
         try {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           return ExcelConversionResult(
@@ -99,5 +191,11 @@ class ExcelConversionService {
   static bool needsConversion(String fileName) {
     final lower = fileName.toLowerCase();
     return lower.endsWith('.xls') && !lower.endsWith('.xlsx');
+  }
+
+  /// Check if file is an Excel file
+  static bool isExcelFile(String fileName) {
+    final lower = fileName.toLowerCase();
+    return lower.endsWith('.xls') || lower.endsWith('.xlsx');
   }
 }

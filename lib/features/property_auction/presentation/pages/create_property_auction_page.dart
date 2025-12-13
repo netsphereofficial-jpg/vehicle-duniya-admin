@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/custom_button.dart';
-import '../../data/services/excel_conversion_service.dart';
 import '../bloc/property_auction_bloc.dart';
 import '../bloc/property_auction_event.dart';
 import '../bloc/property_auction_state.dart';
@@ -26,12 +23,8 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
   DateTime? _startDateTime;
   DateTime? _endDateTime;
   PlatformFile? _excelFile;
-  Uint8List? _convertedBytes; // For storing converted .xlsx bytes
-  bool _isConverting = false;
-  String? _conversionError;
 
   final DateFormat _dateTimeFormatter = DateFormat('dd MMM yyyy, hh:mm a');
-  final ExcelConversionService _conversionService = ExcelConversionService();
 
   Future<void> _selectDateTime(BuildContext ctx, bool isStart) async {
     final initialDate = isStart
@@ -80,7 +73,7 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'], // Accept both formats
+        allowedExtensions: ['xlsx', 'xls'], // Accept both formats - server handles both
         withData: true,
       );
 
@@ -89,18 +82,11 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
 
         setState(() {
           _excelFile = file;
-          _convertedBytes = null;
-          _conversionError = null;
         });
 
-        // Check if .xls file needs conversion
-        if (ExcelConversionService.needsConversion(file.name)) {
-          await _convertXlsFile(file);
-        } else {
-          // .xlsx file - use directly
-          if (_startDateTime != null && _endDateTime != null) {
-            _previewImport();
-          }
+        // Preview import if dates are already selected
+        if (_startDateTime != null && _endDateTime != null) {
+          _previewImport();
         }
       }
     } catch (e) {
@@ -115,73 +101,18 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
     }
   }
 
-  Future<void> _convertXlsFile(PlatformFile file) async {
-    if (file.bytes == null) return;
-
-    setState(() {
-      _isConverting = true;
-      _conversionError = null;
-    });
-
-    try {
-      final result = await _conversionService.convertXlsToXlsx(
-        xlsBytes: file.bytes!,
-        fileName: file.name,
-      );
-
-      if (!mounted) return;
-
-      if (result.success && result.xlsxBytes != null) {
-        setState(() {
-          _convertedBytes = result.xlsxBytes;
-          _isConverting = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('File converted to .xlsx format successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
-        // Preview the import if dates are selected
-        if (_startDateTime != null && _endDateTime != null) {
-          _previewImport();
-        }
-      } else {
-        setState(() {
-          _conversionError = result.errorMessage ?? 'Conversion failed';
-          _isConverting = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _conversionError = 'Conversion failed: $e';
-          _isConverting = false;
-        });
-      }
-    }
-  }
-
   void _previewImport() {
     if (_startDateTime == null || _endDateTime == null) return;
 
-    // Use converted bytes if available (for .xls files), otherwise use original
-    final bytes = _convertedBytes ?? _excelFile?.bytes;
+    final bytes = _excelFile?.bytes;
     if (bytes == null) return;
 
-    // If .xls file is still converting, wait
-    if (_isConverting) return;
-
-    // If conversion failed, don't proceed
-    if (_conversionError != null) return;
-
+    // Send to server for parsing (handles both .xls and .xlsx)
     context.read<PropertyAuctionBloc>().add(PreviewImportRequested(
           startDate: _startDateTime!,
           endDate: _endDateTime!,
           excelBytes: bytes,
-          fileName: _excelFile!.name.replaceAll('.xls', '.xlsx'),
+          fileName: _excelFile!.name,
         ));
   }
 
@@ -206,8 +137,7 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
       return;
     }
 
-    // Use converted bytes if available (for .xls files), otherwise use original
-    final bytes = _convertedBytes ?? _excelFile?.bytes;
+    final bytes = _excelFile?.bytes;
     if (bytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -218,19 +148,18 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
       return;
     }
 
+    // Server handles both .xls and .xlsx formats
     context.read<PropertyAuctionBloc>().add(CreateAuctionsRequested(
           startDate: _startDateTime!,
           endDate: _endDateTime!,
           excelBytes: bytes,
-          fileName: _excelFile!.name.replaceAll('.xls', '.xlsx'),
+          fileName: _excelFile!.name,
         ));
   }
 
   void _clearForm() {
     setState(() {
       _excelFile = null;
-      _convertedBytes = null;
-      _conversionError = null;
     });
     context.read<PropertyAuctionBloc>().add(const ClearImportPreview());
   }
@@ -490,7 +419,7 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
 
             // Excel Upload Area
             InkWell(
-              onTap: (state.isImporting || _isConverting) ? null : _pickExcelFile,
+              onTap: state.isImporting ? null : _pickExcelFile,
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 width: double.infinity,
@@ -498,67 +427,29 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   border: Border.all(
-                    color: _conversionError != null
-                        ? AppColors.error
-                        : (_excelFile != null && !_isConverting)
-                            ? AppColors.success
-                            : AppColors.border,
+                    color: _excelFile != null
+                        ? AppColors.success
+                        : AppColors.border,
                     width: _excelFile != null ? 2 : 1,
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   children: [
-                    if (_isConverting) ...[
+                    if (state.isImporting) ...[
                       const SizedBox(
                         width: 40,
                         height: 40,
                         child: CircularProgressIndicator(strokeWidth: 3),
                       ),
                       const SizedBox(height: 16),
-                      const Text('Converting .xls to .xlsx format...'),
+                      const Text('Processing Excel file on server...'),
                       const SizedBox(height: 4),
                       Text(
                         'This may take a few seconds',
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
-                        ),
-                      ),
-                    ] else if (state.isImporting) ...[
-                      const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(strokeWidth: 3),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Processing Excel file...'),
-                    ] else if (_conversionError != null) ...[
-                      Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Conversion Failed',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.error,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _conversionError!,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: _clearForm,
-                        icon: const Icon(Icons.refresh, size: 18),
-                        label: const Text('Try Again'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
                         ),
                       ),
                     ] else if (_excelFile != null) ...[
@@ -569,36 +460,12 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _formatFileSize(_excelFile!.size),
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (_convertedBytes != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.info.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Converted to .xlsx',
-                                style: TextStyle(
-                                  color: AppColors.info,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        _formatFileSize(_excelFile!.size),
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextButton.icon(
@@ -753,12 +620,10 @@ class _CreatePropertyAuctionPageState extends State<CreatePropertyAuctionPage> {
   }
 
   Widget _buildStickyFooter(BuildContext context, PropertyAuctionState state) {
-    final isLoading = state.isCreating || state.isImporting || _isConverting;
+    final isLoading = state.isCreating || state.isImporting;
     final canSubmit = _startDateTime != null &&
         _endDateTime != null &&
         _excelFile != null &&
-        !_isConverting &&
-        _conversionError == null &&
         state.importResult != null &&
         state.importResult!.successfulRows > 0;
 

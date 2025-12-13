@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart';
 
 import '../../domain/entities/property_auction.dart';
+import 'excel_conversion_service.dart';
 
 /// Result of Excel import operation
 class PropertyExcelImportResult {
@@ -327,5 +328,162 @@ class PropertyExcelImportService {
       return value;
     }
     return null;
+  }
+
+  /// Parse Excel file on server (recommended for .xls files and robust parsing)
+  static Future<PropertyExcelImportResult> parseExcelOnServer({
+    required Uint8List bytes,
+    required String fileName,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String createdBy,
+  }) async {
+    final service = ExcelConversionService();
+    final result = await service.parseExcelOnServer(
+      fileBytes: bytes,
+      fileName: fileName,
+    );
+
+    if (!result.success) {
+      return PropertyExcelImportResult(
+        auctions: [],
+        errors: [result.errorMessage ?? 'Failed to parse Excel file'],
+        totalRows: 0,
+        successfulRows: 0,
+      );
+    }
+
+    return createAuctionsFromServerData(
+      data: result.data,
+      startDate: startDate,
+      endDate: endDate,
+      createdBy: createdBy,
+      serverErrors: result.errors,
+      serverTotalRows: result.totalRows,
+    );
+  }
+
+  /// Create auctions from server-parsed JSON data
+  static PropertyExcelImportResult createAuctionsFromServerData({
+    required List<Map<String, dynamic>> data,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String createdBy,
+    List<String> serverErrors = const [],
+    int serverTotalRows = 0,
+  }) {
+    final auctions = <PropertyAuction>[];
+    final errors = <String>[...serverErrors];
+
+    for (int i = 0; i < data.length; i++) {
+      try {
+        final row = data[i];
+
+        // Helper functions
+        String getString(String key, {String defaultValue = ''}) {
+          final value = row[key];
+          if (value == null) return defaultValue;
+          return value.toString().trim();
+        }
+
+        double getDouble(String key, {double defaultValue = 0.0}) {
+          final value = row[key];
+          if (value == null) return defaultValue;
+          if (value is num) return value.toDouble();
+          final str = value.toString().replaceAll(',', '').replaceAll(' ', '');
+          return double.tryParse(str) ?? defaultValue;
+        }
+
+        DateTime? getDateTime(String key) {
+          final value = row[key];
+          if (value == null) return null;
+          if (value is DateTime) return value;
+          final str = value.toString();
+          if (str.isEmpty) return null;
+          try {
+            return DateTime.parse(str);
+          } catch (_) {
+            return null;
+          }
+        }
+
+        // Check for required fields
+        final eventNo = getString('eventNo');
+        final eventType = getString('eventType');
+
+        if (eventNo.isEmpty && eventType.isEmpty) {
+          continue; // Skip empty rows
+        }
+
+        // Determine status based on dates
+        final now = DateTime.now();
+        PropertyAuctionStatus status;
+        if (now.isBefore(startDate)) {
+          status = PropertyAuctionStatus.upcoming;
+        } else if (now.isAfter(endDate)) {
+          status = PropertyAuctionStatus.ended;
+        } else {
+          status = PropertyAuctionStatus.live;
+        }
+
+        final auction = PropertyAuction(
+          id: '', // Will be assigned by Firestore
+          eventType: eventType,
+          eventNo: eventNo,
+          nitRefNo: getString('nitRefNo'),
+          eventTitle: getString('eventTitle'),
+          eventBank: getString('eventBank'),
+          eventBranch: getString('eventBranch'),
+          propertyCategory: getString('propertyCategory'),
+          propertySubCategory: getString('propertySubCategory'),
+          propertyDescription: getString('propertyDescription'),
+          borrowerName: getString('borrowerName'),
+          reservePrice: getDouble('reservePrice'),
+          tenderFee: getDouble('tenderFee'),
+          priceBid: getString('priceBid'),
+          bidIncrementValue: getDouble('bidIncrementValue'),
+          autoExtensionTime: getString('autoExtensionTime'),
+          noOfAutoExtension: getString('noOfAutoExtension'),
+          dscRequired: getString('dscRequired'),
+          emdAmount: getDouble('emdAmount'),
+          emdBankName: getString('emdBankName'),
+          emdAccountNo: getString('emdAccountNo'),
+          emdIfscCode: getString('emdIfscCode'),
+          pressReleaseDate: getDateTime('pressReleaseDate'),
+          inspectionDateFrom: getDateTime('inspectionDateFrom'),
+          inspectionDateTo: getDateTime('inspectionDateTo'),
+          submissionLastDate: getDateTime('submissionLastDate'),
+          offerOpeningDate: getDateTime('offerOpeningDate'),
+          auctionStartDate: startDate,
+          auctionEndDate: endDate,
+          documentsRequired: getString('documentsRequired'),
+          paperPublishingUrl: getString('paperPublishingUrl').isEmpty
+              ? null
+              : getString('paperPublishingUrl'),
+          detailsOfBidderUrl: getString('detailsOfBidderUrl').isEmpty
+              ? null
+              : getString('detailsOfBidderUrl'),
+          declarationUrl: getString('declarationUrl').isEmpty
+              ? null
+              : getString('declarationUrl'),
+          status: status,
+          isActive: true,
+          createdBy: createdBy,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        auctions.add(auction);
+      } catch (e) {
+        errors.add('Row ${i + 2}: $e'); // +2 for header row and 0-indexing
+      }
+    }
+
+    return PropertyExcelImportResult(
+      auctions: auctions,
+      errors: errors,
+      totalRows: serverTotalRows > 0 ? serverTotalRows : data.length,
+      successfulRows: auctions.length,
+    );
   }
 }

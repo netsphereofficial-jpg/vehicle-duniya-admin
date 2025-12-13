@@ -80,9 +80,10 @@ class PropertyAuctionBloc extends Bloc<PropertyAuctionEvent, PropertyAuctionStat
     try {
       final createdBy = _auth.currentUser?.uid ?? 'unknown';
 
-      // Parse Excel file
-      final result = PropertyExcelImportService.parseExcelFile(
+      // Parse Excel file on server (handles .xls, .xlsx and avoids Dart package issues)
+      final result = await PropertyExcelImportService.parseExcelOnServer(
         bytes: event.excelBytes,
+        fileName: event.fileName,
         startDate: event.startDate,
         endDate: event.endDate,
         createdBy: createdBy,
@@ -126,8 +127,10 @@ class PropertyAuctionBloc extends Bloc<PropertyAuctionEvent, PropertyAuctionStat
     try {
       final createdBy = _auth.currentUser?.uid ?? 'unknown';
 
-      final result = PropertyExcelImportService.parseExcelFile(
+      // Parse Excel file on server (handles .xls, .xlsx and avoids Dart package issues)
+      final result = await PropertyExcelImportService.parseExcelOnServer(
         bytes: event.excelBytes,
+        fileName: event.fileName,
         startDate: event.startDate,
         endDate: event.endDate,
         createdBy: createdBy,
@@ -238,12 +241,14 @@ class PropertyAuctionBloc extends Bloc<PropertyAuctionEvent, PropertyAuctionStat
       return;
     }
 
-    final auction = state.auctions.firstWhere(
-      (a) => a.id == event.auctionId,
-      orElse: () => state.auctions.first,
-    );
-
-    emit(state.copyWith(selectedAuction: auction));
+    final matches = state.auctions.where((a) => a.id == event.auctionId);
+    if (matches.isNotEmpty) {
+      emit(state.copyWith(selectedAuction: matches.first));
+    } else if (state.auctions.isNotEmpty) {
+      emit(state.copyWith(selectedAuction: state.auctions.first));
+    } else {
+      emit(state.copyWith(clearSelectedAuction: true));
+    }
   }
 
   /// Handle clear error
