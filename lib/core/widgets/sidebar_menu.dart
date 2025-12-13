@@ -146,20 +146,14 @@ class _SidebarMenuState extends State<SidebarMenu> {
                   ],
                 ),
 
-                // Car Bazaar
-                _ExpandableMenuItem(
+                // Car Bazaar - Single menu item for shop management
+                _MenuItem(
                   icon: Icons.storefront_outlined,
                   activeIcon: Icons.storefront,
                   label: 'Car Bazaar',
-                  routePrefix: '/car-bazaar',
-                  isExpanded: _isExpanded('/car-bazaar'),
+                  route: '/car-bazaar/manage-shops',
                   currentRoute: widget.currentRoute,
                   isCollapsed: widget.isCollapsed,
-                  onToggle: () => _toggleMenu('/car-bazaar'),
-                  children: const [
-                    _SubMenuItemData(label: 'All Cars', route: '/car-bazaar/all', icon: Icons.list_alt),
-                    _SubMenuItemData(label: 'Add Car', route: '/car-bazaar/add', icon: Icons.add_circle_outline),
-                  ],
                 ),
 
                 // ===== MANAGEMENT =====

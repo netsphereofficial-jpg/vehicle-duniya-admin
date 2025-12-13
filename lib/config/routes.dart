@@ -13,6 +13,8 @@ import '../features/referral_link/presentation/bloc/referral_bloc.dart';
 import '../features/referral_link/presentation/pages/referral_link_page.dart';
 import '../features/kyc_documents/presentation/bloc/kyc_bloc.dart';
 import '../features/kyc_documents/presentation/pages/kyc_page.dart';
+import '../features/car_bazaar/presentation/bloc/car_bazaar_bloc.dart';
+import '../features/car_bazaar/presentation/pages/car_bazaar_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_shell.dart';
 import '../features/settings/presentation/bloc/settings_bloc.dart';
@@ -56,8 +58,7 @@ class AppRoutes {
 
   // Car Bazaar
   static const String carBazaar = '/car-bazaar';
-  static const String carBazaarAll = '/car-bazaar/all';
-  static const String carBazaarAdd = '/car-bazaar/add';
+  static const String carBazaarManageShops = '/car-bazaar/manage-shops';
 
   // ===== MANAGEMENT =====
   static const String kycDocuments = '/kyc-documents';
@@ -266,24 +267,14 @@ class AppRoutes {
             // ===== CAR BAZAAR =====
             GoRoute(
               path: carBazaar,
-              redirect: (context, state) => carBazaarAll,
+              redirect: (context, state) => carBazaarManageShops,
             ),
             GoRoute(
-              path: carBazaarAll,
-              name: 'car-bazaar-all',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'All Cars',
-                description: 'Browse all cars listed in the bazaar',
-                icon: Icons.directions_car,
-              ),
-            ),
-            GoRoute(
-              path: carBazaarAdd,
-              name: 'car-bazaar-add',
-              builder: (context, state) => const _ComingSoonPage(
-                title: 'Add Car',
-                description: 'Add a new car to the bazaar',
-                icon: Icons.add_circle_outline,
+              path: carBazaarManageShops,
+              name: 'car-bazaar-manage-shops',
+              builder: (context, state) => BlocProvider<CarBazaarBloc>(
+                create: (_) => sl<CarBazaarBloc>(),
+                child: const CarBazaarPage(),
               ),
             ),
 

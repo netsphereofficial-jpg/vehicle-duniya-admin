@@ -20,8 +20,7 @@ enum AppPermission {
   propertyAuctionsUserSurvey,
 
   // Car Bazaar
-  carBazaarAll,
-  carBazaarAdd,
+  carBazaarManageShops,
 
   // Management
   kycDocuments,
@@ -139,15 +138,10 @@ const Map<AppPermission, PermissionInfo> permissionInfo = {
   ),
 
   // Car Bazaar
-  AppPermission.carBazaarAll: PermissionInfo(
-    label: 'All Cars',
+  AppPermission.carBazaarManageShops: PermissionInfo(
+    label: 'Manage Shops',
     group: 'Car Bazaar',
-    route: '/car-bazaar/all',
-  ),
-  AppPermission.carBazaarAdd: PermissionInfo(
-    label: 'Add Car',
-    group: 'Car Bazaar',
-    route: '/car-bazaar/add',
+    route: '/car-bazaar/manage-shops',
   ),
 
   // Management
