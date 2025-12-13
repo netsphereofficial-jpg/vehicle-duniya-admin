@@ -2,33 +2,55 @@ const functions = require("firebase-functions");
 const XLSX = require("xlsx");
 
 /**
- * Cloud Function to convert .xls files to .xlsx format
+ * HTTP Cloud Function to convert .xls files to .xlsx format
  * Accepts base64 encoded .xls file and returns base64 encoded .xlsx file
  */
 exports.convertXlsToXlsx = functions
-    .region("asia-south1") // Mumbai region for lower latency in India
+    .region("asia-south1")
     .runWith({
       timeoutSeconds: 60,
       memory: "256MB",
     })
-    .https.onCall(async (data, context) => {
+    .https.onRequest(async (req, res) => {
+      // Handle CORS
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+
+      // Handle preflight request
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      // Only allow POST
+      if (req.method !== "POST") {
+        res.status(405).json({success: false, error: "Method not allowed"});
+        return;
+      }
+
       try {
+        const data = req.body;
+
         // Validate input
         if (!data || !data.fileBase64) {
-          throw new functions.https.HttpsError(
-              "invalid-argument",
-              "Missing fileBase64 parameter",
-          );
+          res.status(400).json({
+            success: false,
+            error: "Missing fileBase64 parameter",
+          });
+          return;
         }
 
         const fileName = data.fileName || "file.xls";
 
         // Check if the file is actually a .xls file
-        if (!fileName.toLowerCase().endsWith(".xls")) {
-          throw new functions.https.HttpsError(
-              "invalid-argument",
-              "File must be a .xls file",
-          );
+        if (!fileName.toLowerCase().endsWith(".xls") ||
+            fileName.toLowerCase().endsWith(".xlsx")) {
+          res.status(400).json({
+            success: false,
+            error: "File must be a .xls file (not .xlsx)",
+          });
+          return;
         }
 
         // Decode base64 to buffer
@@ -53,23 +75,16 @@ exports.convertXlsToXlsx = functions
         const xlsxBase64 = xlsxBuffer.toString("base64");
         const newFileName = fileName.replace(/\.xls$/i, ".xlsx");
 
-        return {
+        res.status(200).json({
           success: true,
           xlsxBase64: xlsxBase64,
           fileName: newFileName,
-          originalSize: xlsBuffer.length,
-          convertedSize: xlsxBuffer.length,
-        };
+        });
       } catch (error) {
         console.error("Conversion error:", error);
-
-        if (error instanceof functions.https.HttpsError) {
-          throw error;
-        }
-
-        throw new functions.https.HttpsError(
-            "internal",
-            `Failed to convert file: ${error.message}`,
-        );
+        res.status(500).json({
+          success: false,
+          error: `Failed to convert file: ${error.message}`,
+        });
       }
     });

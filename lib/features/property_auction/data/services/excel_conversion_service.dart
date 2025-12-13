@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:http/http.dart' as http;
 
 /// Result of Excel conversion operation
 class ExcelConversionResult {
@@ -20,11 +20,9 @@ class ExcelConversionResult {
 
 /// Service for converting .xls files to .xlsx using Firebase Cloud Function
 class ExcelConversionService {
-  final FirebaseFunctions _functions;
-
-  ExcelConversionService({FirebaseFunctions? functions})
-      : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'asia-south1');
+  // Cloud Function URL for asia-south1 region
+  static const String _functionUrl =
+      'https://asia-south1-vehicle-duniya-198e5.cloudfunctions.net/convertXlsToXlsx';
 
   /// Convert .xls file to .xlsx format
   /// Returns the converted bytes or null if conversion fails
@@ -34,7 +32,7 @@ class ExcelConversionService {
   }) async {
     try {
       // Check if file is actually .xls
-      if (!fileName.toLowerCase().endsWith('.xls')) {
+      if (!needsConversion(fileName)) {
         return ExcelConversionResult(
           success: false,
           errorMessage: 'File is not a .xls file',
@@ -44,39 +42,51 @@ class ExcelConversionService {
       // Encode to base64
       final base64Data = base64Encode(xlsBytes);
 
-      // Call Cloud Function
-      final callable = _functions.httpsCallable(
-        'convertXlsToXlsx',
-        options: HttpsCallableOptions(
-          timeout: const Duration(seconds: 60),
-        ),
+      // Call Cloud Function via HTTP
+      final response = await http.post(
+        Uri.parse(_functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'fileBase64': base64Data,
+          'fileName': fileName,
+        }),
       );
 
-      final result = await callable.call<Map<String, dynamic>>({
-        'fileBase64': base64Data,
-        'fileName': fileName,
-      });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
 
-      final data = result.data;
+        if (data['success'] == true && data['xlsxBase64'] != null) {
+          final xlsxBytes = base64Decode(data['xlsxBase64'] as String);
+          return ExcelConversionResult(
+            success: true,
+            xlsxBytes: Uint8List.fromList(xlsxBytes),
+            fileName: data['fileName'] as String? ??
+                fileName.replaceAll('.xls', '.xlsx'),
+          );
+        }
 
-      if (data['success'] == true && data['xlsxBase64'] != null) {
-        final xlsxBytes = base64Decode(data['xlsxBase64'] as String);
         return ExcelConversionResult(
-          success: true,
-          xlsxBytes: Uint8List.fromList(xlsxBytes),
-          fileName: data['fileName'] as String? ?? fileName.replaceAll('.xls', '.xlsx'),
+          success: false,
+          errorMessage: data['error'] as String? ?? 'Conversion failed',
         );
+      } else {
+        // Try to parse error message from response
+        try {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          return ExcelConversionResult(
+            success: false,
+            errorMessage: data['error'] as String? ??
+                'Server error: ${response.statusCode}',
+          );
+        } catch (_) {
+          return ExcelConversionResult(
+            success: false,
+            errorMessage: 'Server error: ${response.statusCode}',
+          );
+        }
       }
-
-      return const ExcelConversionResult(
-        success: false,
-        errorMessage: 'Conversion failed - no data returned',
-      );
-    } on FirebaseFunctionsException catch (e) {
-      return ExcelConversionResult(
-        success: false,
-        errorMessage: e.message ?? 'Cloud function error: ${e.code}',
-      );
     } catch (e) {
       return ExcelConversionResult(
         success: false,
