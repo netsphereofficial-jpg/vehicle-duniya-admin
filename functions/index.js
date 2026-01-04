@@ -1037,6 +1037,7 @@ exports.parseVehicleExcelFile = functions
  * Runs every 5 minutes
  * - Moves "upcoming" auctions to "live" when startDate passes
  * - Moves "live" auctions to "ended" when endDate passes
+ * Handles both vehicle auctions (auctions) and property auctions (property_auctions)
  */
 exports.updateAuctionStatuses = functions
     .region("asia-south1")
@@ -1056,16 +1057,16 @@ exports.updateAuctionStatuses = functions
       let liveToEnded = 0;
 
       try {
-        // Get all auctions that need status update
+        // ============ VEHICLE AUCTIONS ============
         const auctionsRef = db.collection("auctions");
 
-        // 1. Find "upcoming" auctions where startDate has passed
+        // 1. Find "upcoming" vehicle auctions where startDate has passed
         const upcomingQuery = await auctionsRef
             .where("status", "==", "upcoming")
             .where("startDate", "<=", now)
             .get();
 
-        console.log(`[AuctionStatusUpdate] Found ${upcomingQuery.size} upcoming auctions to activate`);
+        console.log(`[AuctionStatusUpdate] Found ${upcomingQuery.size} upcoming vehicle auctions to activate`);
 
         // Update upcoming -> live
         const upcomingBatch = db.batch();
@@ -1080,14 +1081,14 @@ exports.updateAuctionStatuses = functions
               updatedAt: now,
             });
             liveToEnded++;
-            console.log(`[AuctionStatusUpdate] Auction ${doc.id} (${data.name}): upcoming -> ended (already expired)`);
+            console.log(`[AuctionStatusUpdate] Vehicle Auction ${doc.id} (${data.name}): upcoming -> ended (already expired)`);
           } else {
             upcomingBatch.update(doc.ref, {
               status: "live",
               updatedAt: now,
             });
             upcomingToLive++;
-            console.log(`[AuctionStatusUpdate] Auction ${doc.id} (${data.name}): upcoming -> live`);
+            console.log(`[AuctionStatusUpdate] Vehicle Auction ${doc.id} (${data.name}): upcoming -> live`);
           }
         });
 
@@ -1095,13 +1096,13 @@ exports.updateAuctionStatuses = functions
           await upcomingBatch.commit();
         }
 
-        // 2. Find "live" auctions where endDate has passed
+        // 2. Find "live" vehicle auctions where endDate has passed
         const liveQuery = await auctionsRef
             .where("status", "==", "live")
             .where("endDate", "<=", now)
             .get();
 
-        console.log(`[AuctionStatusUpdate] Found ${liveQuery.size} live auctions to end`);
+        console.log(`[AuctionStatusUpdate] Found ${liveQuery.size} live vehicle auctions to end`);
 
         // Update live -> ended
         const liveBatch = db.batch();
@@ -1112,14 +1113,76 @@ exports.updateAuctionStatuses = functions
             updatedAt: now,
           });
           liveToEnded++;
-          console.log(`[AuctionStatusUpdate] Auction ${doc.id} (${data.name}): live -> ended`);
+          console.log(`[AuctionStatusUpdate] Vehicle Auction ${doc.id} (${data.name}): live -> ended`);
         });
 
         if (liveQuery.size > 0) {
           await liveBatch.commit();
         }
 
-        const summary = `Updated ${upcomingToLive} upcoming->live, ${liveToEnded} live->ended`;
+        // ============ PROPERTY AUCTIONS ============
+        const propertyAuctionsRef = db.collection("property_auctions");
+
+        // 3. Find "upcoming" property auctions where auctionStartDate has passed
+        const propUpcomingQuery = await propertyAuctionsRef
+            .where("status", "==", "upcoming")
+            .where("auctionStartDate", "<=", now)
+            .get();
+
+        console.log(`[AuctionStatusUpdate] Found ${propUpcomingQuery.size} upcoming property auctions to activate`);
+
+        // Update upcoming -> live
+        const propUpcomingBatch = db.batch();
+        propUpcomingQuery.docs.forEach((doc) => {
+          const data = doc.data();
+          const endDate = data.auctionEndDate?.toDate();
+
+          if (endDate && endDate <= nowDate) {
+            propUpcomingBatch.update(doc.ref, {
+              status: "ended",
+              updatedAt: now,
+            });
+            liveToEnded++;
+            console.log(`[AuctionStatusUpdate] Property Auction ${doc.id} (${data.eventTitle}): upcoming -> ended (already expired)`);
+          } else {
+            propUpcomingBatch.update(doc.ref, {
+              status: "live",
+              updatedAt: now,
+            });
+            upcomingToLive++;
+            console.log(`[AuctionStatusUpdate] Property Auction ${doc.id} (${data.eventTitle}): upcoming -> live`);
+          }
+        });
+
+        if (propUpcomingQuery.size > 0) {
+          await propUpcomingBatch.commit();
+        }
+
+        // 4. Find "live" property auctions where auctionEndDate has passed
+        const propLiveQuery = await propertyAuctionsRef
+            .where("status", "==", "live")
+            .where("auctionEndDate", "<=", now)
+            .get();
+
+        console.log(`[AuctionStatusUpdate] Found ${propLiveQuery.size} live property auctions to end`);
+
+        // Update live -> ended
+        const propLiveBatch = db.batch();
+        propLiveQuery.docs.forEach((doc) => {
+          const data = doc.data();
+          propLiveBatch.update(doc.ref, {
+            status: "ended",
+            updatedAt: now,
+          });
+          liveToEnded++;
+          console.log(`[AuctionStatusUpdate] Property Auction ${doc.id} (${data.eventTitle}): live -> ended`);
+        });
+
+        if (propLiveQuery.size > 0) {
+          await propLiveBatch.commit();
+        }
+
+        const summary = `Updated ${upcomingToLive} upcoming->live, ${liveToEnded} live->ended (both vehicle & property)`;
         console.log(`[AuctionStatusUpdate] Complete: ${summary}`);
 
         return {
@@ -1143,6 +1206,7 @@ exports.updateAuctionStatuses = functions
 /**
  * HTTP endpoint to manually trigger auction status update
  * Useful for testing or forcing an immediate update
+ * Handles both vehicle auctions and property auctions
  */
 exports.triggerAuctionStatusUpdate = functions
     .region("asia-south1")
@@ -1171,6 +1235,7 @@ exports.triggerAuctionStatusUpdate = functions
       const updatedAuctions = [];
 
       try {
+        // ============ VEHICLE AUCTIONS ============
         const auctionsRef = db.collection("auctions");
 
         // 1. Update upcoming -> live
@@ -1191,6 +1256,7 @@ exports.triggerAuctionStatusUpdate = functions
             liveToEnded++;
             updatedAuctions.push({
               id: doc.id,
+              type: "vehicle",
               name: data.name,
               transition: "upcoming -> ended",
             });
@@ -1202,6 +1268,7 @@ exports.triggerAuctionStatusUpdate = functions
             upcomingToLive++;
             updatedAuctions.push({
               id: doc.id,
+              type: "vehicle",
               name: data.name,
               transition: "upcoming -> live",
             });
@@ -1223,14 +1290,76 @@ exports.triggerAuctionStatusUpdate = functions
           liveToEnded++;
           updatedAuctions.push({
             id: doc.id,
+            type: "vehicle",
             name: data.name,
+            transition: "live -> ended",
+          });
+        }
+
+        // ============ PROPERTY AUCTIONS ============
+        const propertyAuctionsRef = db.collection("property_auctions");
+
+        // 3. Update property upcoming -> live
+        const propUpcomingQuery = await propertyAuctionsRef
+            .where("status", "==", "upcoming")
+            .where("auctionStartDate", "<=", now)
+            .get();
+
+        for (const doc of propUpcomingQuery.docs) {
+          const data = doc.data();
+          const endDate = data.auctionEndDate?.toDate();
+
+          if (endDate && endDate <= nowDate) {
+            await doc.ref.update({
+              status: "ended",
+              updatedAt: now,
+            });
+            liveToEnded++;
+            updatedAuctions.push({
+              id: doc.id,
+              type: "property",
+              name: data.eventTitle,
+              transition: "upcoming -> ended",
+            });
+          } else {
+            await doc.ref.update({
+              status: "live",
+              updatedAt: now,
+            });
+            upcomingToLive++;
+            updatedAuctions.push({
+              id: doc.id,
+              type: "property",
+              name: data.eventTitle,
+              transition: "upcoming -> live",
+            });
+          }
+        }
+
+        // 4. Update property live -> ended
+        const propLiveQuery = await propertyAuctionsRef
+            .where("status", "==", "live")
+            .where("auctionEndDate", "<=", now)
+            .get();
+
+        for (const doc of propLiveQuery.docs) {
+          const data = doc.data();
+          await doc.ref.update({
+            status: "ended",
+            updatedAt: now,
+          });
+          liveToEnded++;
+          updatedAuctions.push({
+            id: doc.id,
+            type: "property",
+            name: data.eventTitle,
             transition: "live -> ended",
           });
         }
 
         res.status(200).json({
           success: true,
-          message: `Updated ${upcomingToLive + liveToEnded} auctions`,
+          message: `Updated ${upcomingToLive + liveToEnded} auctions (vehicle + property)`,
           upcomingToLive,
           liveToEnded,
           updatedAuctions,

@@ -98,11 +98,11 @@ class _ActivePropertyAuctionsPageState
         }
       },
       builder: (context, state) {
-        // Filter to show only active auctions (live + upcoming)
+        // Filter to show only active auctions (live + upcoming) using calculatedStatus for real-time accuracy
         final activeAuctions = state.filteredAuctions
             .where((a) =>
-                a.status == PropertyAuctionStatus.live ||
-                a.status == PropertyAuctionStatus.upcoming)
+                a.calculatedStatus == PropertyAuctionStatus.live ||
+                a.calculatedStatus == PropertyAuctionStatus.upcoming)
             .toList();
 
         return LayoutBuilder(

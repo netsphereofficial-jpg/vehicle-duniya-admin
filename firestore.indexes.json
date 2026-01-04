@@ -25,6 +25,30 @@
       ]
     },
     {
+      "collectionGroup": "auctions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "endDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "property_auctions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "auctionStartDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "property_auctions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "auctionEndDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "vehicles",
       "queryScope": "COLLECTION",
       "fields": [

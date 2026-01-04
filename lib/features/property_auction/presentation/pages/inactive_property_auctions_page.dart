@@ -67,9 +67,9 @@ class _InactivePropertyAuctionsPageState
         }
       },
       builder: (context, state) {
-        // Filter to show only ended auctions
+        // Filter to show only ended auctions using calculatedStatus for real-time accuracy
         final inactiveAuctions = state.filteredAuctions
-            .where((a) => a.status == PropertyAuctionStatus.ended)
+            .where((a) => a.calculatedStatus == PropertyAuctionStatus.ended)
             .toList();
 
         return LayoutBuilder(
