@@ -70,6 +70,9 @@ abstract class AuctionRepository {
   /// Add a vehicle to an auction
   Future<VehicleItem> addVehicleToAuction(VehicleItem vehicle);
 
+  /// Add multiple vehicles to an auction in a batch (much faster)
+  Future<int> addVehiclesBatch(String auctionId, List<VehicleItem> vehicles);
+
   /// Update a vehicle
   Future<void> updateVehicle(String vehicleId, Map<String, dynamic> updates);
 

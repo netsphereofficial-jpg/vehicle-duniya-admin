@@ -312,6 +312,48 @@ class AuctionRepositoryImpl implements AuctionRepository {
   }
 
   @override
+  Future<int> addVehiclesBatch(String auctionId, List<VehicleItem> vehicles) async {
+    if (vehicles.isEmpty) return 0;
+
+    AppLogger.info(_tag, 'Batch adding ${vehicles.length} vehicles to auction $auctionId');
+
+    final vehicleIds = <String>[];
+    int savedCount = 0;
+
+    // Firestore batch limit is 500 operations
+    // We'll process in chunks to be safe
+    const batchSize = 400;
+
+    for (int i = 0; i < vehicles.length; i += batchSize) {
+      final batch = _firestore.batch();
+      final end = (i + batchSize < vehicles.length) ? i + batchSize : vehicles.length;
+      final chunk = vehicles.sublist(i, end);
+
+      for (final vehicle in chunk) {
+        final vehicleWithAuctionId = vehicle.copyWith(auctionId: auctionId);
+        final vehicleModel = VehicleItemModel.fromEntity(vehicleWithAuctionId);
+        final docRef = _vehiclesRef.doc(); // Generate new document reference
+        vehicleIds.add(docRef.id);
+        batch.set(docRef, vehicleModel.toFirestore());
+        savedCount++;
+      }
+
+      // Commit this batch
+      await batch.commit();
+      AppLogger.debug(_tag, 'Committed batch: $savedCount/${vehicles.length} vehicles');
+    }
+
+    // Update auction with all vehicle IDs in a single operation
+    await _auctionsRef.doc(auctionId).update({
+      'vehicleIds': FieldValue.arrayUnion(vehicleIds),
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+
+    AppLogger.info(_tag, 'Batch complete: $savedCount vehicles saved');
+    return savedCount;
+  }
+
+  @override
   Future<void> updateVehicle(
     String vehicleId,
     Map<String, dynamic> updates,

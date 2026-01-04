@@ -18,6 +18,7 @@ enum AuctionStateStatus {
   uploaded,
   importing,
   imported,
+  savingVehicles, // New status for saving imported vehicles to Firestore
   error,
 }
 
@@ -39,6 +40,10 @@ class AuctionState extends Equatable {
   final int importTotalRows;
   final int importSuccessfulRows;
 
+  // Vehicle saving progress
+  final int savingVehiclesCurrent;
+  final int savingVehiclesTotal;
+
   const AuctionState({
     this.status = AuctionStateStatus.initial,
     this.categories = const [],
@@ -53,6 +58,8 @@ class AuctionState extends Equatable {
     this.importErrors = const [],
     this.importTotalRows = 0,
     this.importSuccessfulRows = 0,
+    this.savingVehiclesCurrent = 0,
+    this.savingVehiclesTotal = 0,
   });
 
   /// Initial state
@@ -82,6 +89,8 @@ class AuctionState extends Equatable {
     List<String>? importErrors,
     int? importTotalRows,
     int? importSuccessfulRows,
+    int? savingVehiclesCurrent,
+    int? savingVehiclesTotal,
   }) {
     return AuctionState(
       status: status ?? this.status,
@@ -97,6 +106,8 @@ class AuctionState extends Equatable {
       importErrors: importErrors ?? this.importErrors,
       importTotalRows: importTotalRows ?? this.importTotalRows,
       importSuccessfulRows: importSuccessfulRows ?? this.importSuccessfulRows,
+      savingVehiclesCurrent: savingVehiclesCurrent ?? this.savingVehiclesCurrent,
+      savingVehiclesTotal: savingVehiclesTotal ?? this.savingVehiclesTotal,
     );
   }
 
@@ -119,6 +130,13 @@ class AuctionState extends Equatable {
 
   /// Check if currently importing
   bool get isImporting => status == AuctionStateStatus.importing;
+
+  /// Check if currently saving vehicles to Firestore
+  bool get isSavingVehicles => status == AuctionStateStatus.savingVehicles;
+
+  /// Get saving vehicles progress text
+  String get savingVehiclesProgress =>
+      'Saving vehicles: $savingVehiclesCurrent of $savingVehiclesTotal';
 
   /// Check if import has errors
   bool get hasImportErrors => importErrors.isNotEmpty;
@@ -191,6 +209,8 @@ class AuctionState extends Equatable {
         importErrors,
         importTotalRows,
         importSuccessfulRows,
+        savingVehiclesCurrent,
+        savingVehiclesTotal,
       ];
 
   @override
