@@ -142,6 +142,27 @@ class Auction extends Equatable {
   /// Check if auction has ended
   bool get hasEnded => DateTime.now().isAfter(endDate);
 
+  /// Get the effective/real-time status based on current time
+  /// This provides instant status updates without waiting for the cron job
+  AuctionStatus get effectiveStatus {
+    // If cancelled, always stay cancelled
+    if (status == AuctionStatus.cancelled) return AuctionStatus.cancelled;
+
+    final now = DateTime.now();
+
+    // Check if ended
+    if (now.isAfter(endDate)) return AuctionStatus.ended;
+
+    // Check if live
+    if (now.isAfter(startDate)) return AuctionStatus.live;
+
+    // Otherwise upcoming
+    return AuctionStatus.upcoming;
+  }
+
+  /// Check if DB status is out of sync with real time
+  bool get needsStatusSync => status != effectiveStatus;
+
   /// Copy with method for immutable updates
   Auction copyWith({
     String? id,

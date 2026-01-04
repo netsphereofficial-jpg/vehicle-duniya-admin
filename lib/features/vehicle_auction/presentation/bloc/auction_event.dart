@@ -228,17 +228,26 @@ class SelectAuction extends AuctionEvent {
 class ImportVehiclesFromExcel extends AuctionEvent {
   final Uint8List fileBytes;
   final String auctionId;
+  final String fileName;
 
   const ImportVehiclesFromExcel({
     required this.fileBytes,
     required this.auctionId,
+    required this.fileName,
   });
 
   @override
-  List<Object?> get props => [auctionId];
+  List<Object?> get props => [auctionId, fileName];
 }
 
 /// Clear imported vehicles (reset import state)
 class ClearImportedVehicles extends AuctionEvent {
   const ClearImportedVehicles();
+}
+
+// ============ Status Sync Events ============
+
+/// Trigger server-side auction status update (cron job trigger)
+class SyncAuctionStatusesRequested extends AuctionEvent {
+  const SyncAuctionStatusesRequested();
 }

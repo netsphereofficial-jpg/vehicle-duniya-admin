@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/utils/app_logger.dart';
+import '../../data/services/auction_status_service.dart';
 import '../../data/services/vehicle_excel_import_service.dart';
 import '../../domain/repositories/auction_repository.dart';
 import 'auction_event.dart';
@@ -48,6 +49,9 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     // Excel import events
     on<ImportVehiclesFromExcel>(_onImportVehiclesFromExcel);
     on<ClearImportedVehicles>(_onClearImportedVehicles);
+
+    // Status sync events
+    on<SyncAuctionStatusesRequested>(_onSyncAuctionStatuses);
   }
 
   // ============ Category Handlers ============
@@ -158,11 +162,60 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
       );
 
       AppLogger.info(_tag, 'Auction created: ${auction.id}');
+
+      // Save imported vehicles to Firestore if any
+      int savedVehiclesCount = 0;
+      final totalVehicles = state.importedVehicles.length;
+
+      if (totalVehicles > 0) {
+        AppLogger.info(
+          _tag,
+          'Saving $totalVehicles imported vehicles to auction ${auction.id}',
+        );
+
+        // Emit saving vehicles status
+        emit(state.copyWith(
+          status: AuctionStateStatus.savingVehicles,
+          savingVehiclesCurrent: 0,
+          savingVehiclesTotal: totalVehicles,
+          selectedAuction: auction,
+        ));
+
+        try {
+          // Use batch write for much faster performance
+          savedVehiclesCount = await _repository.addVehiclesBatch(
+            auction.id,
+            state.importedVehicles,
+          );
+
+          // Update progress to complete
+          emit(state.copyWith(
+            status: AuctionStateStatus.savingVehicles,
+            savingVehiclesCurrent: savedVehiclesCount,
+            savingVehiclesTotal: totalVehicles,
+            selectedAuction: auction,
+          ));
+
+          AppLogger.info(
+            _tag,
+            'Batch saved $savedVehiclesCount/$totalVehicles vehicles',
+          );
+        } catch (e) {
+          AppLogger.error(_tag, 'Failed to batch save vehicles', e);
+          // Continue with auction creation even if vehicle save fails
+        }
+      }
+
+      final successMessage = savedVehiclesCount > 0
+          ? 'Auction created with $savedVehiclesCount vehicles!'
+          : 'Auction created successfully!';
+
       emit(state.copyWith(
         status: AuctionStateStatus.created,
         auctions: [auction, ...state.auctions],
         selectedAuction: auction,
-        successMessage: 'Auction created successfully!',
+        successMessage: successMessage,
+        clearImportedVehicles: true, // Clear imported vehicles after saving
       ));
     } catch (e) {
       AppLogger.error(_tag, 'Failed to create auction', e);
@@ -476,6 +529,7 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
   ) async {
     AppLogger.blocEvent(_tag, 'ImportVehiclesFromExcel');
     AppLogger.debug(_tag, 'Importing vehicles for auction: ${event.auctionId}');
+    AppLogger.debug(_tag, 'File name: ${event.fileName}');
     emit(state.copyWith(
       status: AuctionStateStatus.importing,
       clearImportedVehicles: true,
@@ -483,9 +537,11 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     ));
 
     try {
-      final result = VehicleExcelImportService.parseExcelFile(
-        event.fileBytes,
-        event.auctionId,
+      // Use server-side parsing for robust .xls and .xlsx support
+      final result = await VehicleExcelImportService.parseExcelOnServer(
+        bytes: event.fileBytes,
+        fileName: event.fileName,
+        auctionId: event.auctionId,
       );
 
       AppLogger.info(
@@ -526,5 +582,36 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
       importTotalRows: 0,
       importSuccessfulRows: 0,
     ));
+  }
+
+  // ============ Status Sync Handlers ============
+
+  Future<void> _onSyncAuctionStatuses(
+    SyncAuctionStatusesRequested event,
+    Emitter<AuctionState> emit,
+  ) async {
+    AppLogger.blocEvent(_tag, 'SyncAuctionStatusesRequested');
+
+    try {
+      // Trigger server-side status update
+      final updatedCount = await AuctionStatusService.triggerStatusUpdate();
+
+      if (updatedCount > 0) {
+        AppLogger.info(_tag, 'Synced $updatedCount auction statuses');
+
+        // Reload auctions to get updated statuses
+        final auctions = await _repository.getAuctions(
+          statusFilter: state.currentFilter,
+        );
+
+        emit(state.copyWith(
+          auctions: auctions,
+          successMessage: '$updatedCount auction(s) status updated',
+        ));
+      }
+    } catch (e) {
+      // Silently fail - this is a background sync
+      AppLogger.warning(_tag, 'Status sync failed: $e');
+    }
   }
 }

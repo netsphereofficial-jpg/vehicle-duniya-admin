@@ -40,6 +40,8 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
   void initState() {
     super.initState();
     _loadAuctions();
+    // Trigger status sync on page load for instant updates
+    context.read<AuctionBloc>().add(const SyncAuctionStatusesRequested());
   }
 
   @override
@@ -69,14 +71,17 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
   }
 
   List<Auction> _filterAuctions(List<Auction> auctions) {
-    // Single-pass optimized filtering
+    // Single-pass optimized filtering using effectiveStatus for real-time accuracy
     return auctions.where((a) {
+      // Use effectiveStatus for instant/real-time status (not waiting for cron)
+      final status = a.effectiveStatus;
+
       // Status must be active (upcoming or live)
-      if (a.status != AuctionStatus.upcoming && a.status != AuctionStatus.live) {
+      if (status != AuctionStatus.upcoming && status != AuctionStatus.live) {
         return false;
       }
       // Apply additional status filter
-      if (_statusFilter != null && a.status != _statusFilter) {
+      if (_statusFilter != null && status != _statusFilter) {
         return false;
       }
       // Apply search filter
@@ -643,7 +648,7 @@ class _ActiveAuctionsPageState extends State<ActiveAuctionsPage> {
                 DataCell(Text(dateFormatter.format(auction.startDate))),
                 DataCell(Text(dateFormatter.format(auction.endDate))),
                 DataCell(Text(auction.mode.displayName)),
-                DataCell(_buildStatusChip(auction.status)),
+                DataCell(_buildStatusChip(auction.effectiveStatus)),
                 DataCell(Text('${auction.vehicleCount}')),
                 DataCell(
                   Row(

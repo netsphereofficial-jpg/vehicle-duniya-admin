@@ -27,6 +27,8 @@ class _InactiveAuctionsPageState extends State<InactiveAuctionsPage> {
   void initState() {
     super.initState();
     _loadAuctions();
+    // Trigger status sync on page load for instant updates
+    context.read<AuctionBloc>().add(const SyncAuctionStatusesRequested());
   }
 
   void _loadAuctions() {
@@ -34,13 +36,15 @@ class _InactiveAuctionsPageState extends State<InactiveAuctionsPage> {
   }
 
   List<Auction> _filterAuctions(List<Auction> auctions) {
-    var filtered = auctions.where((a) =>
-        a.status == AuctionStatus.ended ||
-        a.status == AuctionStatus.cancelled).toList();
+    // Use effectiveStatus for real-time accuracy
+    var filtered = auctions.where((a) {
+      final status = a.effectiveStatus;
+      return status == AuctionStatus.ended || status == AuctionStatus.cancelled;
+    }).toList();
 
-    // Apply status filter
+    // Apply status filter using effectiveStatus
     if (_statusFilter != null) {
-      filtered = filtered.where((a) => a.status == _statusFilter).toList();
+      filtered = filtered.where((a) => a.effectiveStatus == _statusFilter).toList();
     }
 
     // Apply search filter
@@ -308,7 +312,7 @@ class _InactiveAuctionsPageState extends State<InactiveAuctionsPage> {
         final auction = auctions[index];
         return AuctionListItem(
           auction: auction,
-          onTap: () => context.go('/vehicles/auctions/${auction.id}'),
+          onTap: () => context.go('/vehicle-auctions/${auction.id}'),
           onDelete: () => _showDeleteConfirmation(context, auction),
         );
       },
@@ -355,14 +359,14 @@ class _InactiveAuctionsPageState extends State<InactiveAuctionsPage> {
                 DataCell(Text(dateFormatter.format(auction.startDate))),
                 DataCell(Text(dateFormatter.format(auction.endDate))),
                 DataCell(Text(auction.mode.displayName)),
-                DataCell(_buildStatusChip(auction.status)),
+                DataCell(_buildStatusChip(auction.effectiveStatus)),
                 DataCell(Text('${auction.vehicleCount}')),
                 DataCell(
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        onPressed: () => context.go('/vehicles/auctions/${auction.id}'),
+                        onPressed: () => context.go('/vehicle-auctions/${auction.id}'),
                         icon: const Icon(Icons.visibility_outlined),
                         iconSize: 20,
                         tooltip: 'View',
