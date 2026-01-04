@@ -139,7 +139,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx'], // Only .xlsx supported, not .xls
+        allowedExtensions: ['xlsx', 'xls'], // Both .xlsx and .xls supported
         withData: true,
       );
 
@@ -149,11 +149,12 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
           _vehicleExcelFile = file;
         });
 
-        // Parse the Excel file
+        // Parse the Excel file on server
         if (file.bytes != null && mounted) {
           context.read<AuctionBloc>().add(ImportVehiclesFromExcel(
             fileBytes: file.bytes!,
             auctionId: widget.auctionId ?? 'new',
+            fileName: file.name,
           ));
         }
       }
@@ -277,26 +278,64 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
           );
         }
       },
+      buildWhen: (previous, current) {
+        // Always rebuild to show progress updates
+        return true;
+      },
       builder: (context, state) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 24),
-                _buildAuctionDetailsCard(context, state),
-                const SizedBox(height: 24),
-                _buildFilesCard(context, state),
-                const SizedBox(height: 24),
-                _buildVehicleImportCard(context, state),
-                const SizedBox(height: 24),
-                _buildActionButtons(context, state),
-              ],
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context),
+                    const SizedBox(height: 24),
+                    _buildAuctionDetailsCard(context, state),
+                    const SizedBox(height: 24),
+                    _buildVehicleImportCard(context, state),
+                    const SizedBox(height: 24),
+                    _buildFilesCard(context, state),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(context, state),
+                  ],
+                ),
+              ),
             ),
-          ),
+            // Saving vehicles overlay
+            if (state.isSavingVehicles)
+              Container(
+                color: Colors.black54,
+                child: Center(
+                  child: Card(
+                    margin: const EdgeInsets.all(32),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: CircularProgressIndicator(strokeWidth: 4),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Saving ${state.savingVehiclesTotal} vehicles...',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -306,7 +345,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
     return Row(
       children: [
         IconButton(
-          onPressed: () => context.go('/vehicles/auctions/active'),
+          onPressed: () => context.go('/vehicle-auctions/active'),
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Back',
         ),
@@ -878,7 +917,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Only .xlsx format supported (Save as Excel Workbook)',
+                        'Supports .xlsx and .xls formats',
                         style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                       ),
                     ],
@@ -937,7 +976,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
   }
 
   Widget _buildActionButtons(BuildContext context, AuctionState state) {
-    final isLoading = state.isCreating || state.isUpdating || state.isUploading;
+    final isLoading = state.isCreating || state.isUpdating || state.isUploading || state.isSavingVehicles;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -945,7 +984,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
         CustomButton(
           text: 'Cancel',
           type: ButtonType.outline,
-          onPressed: isLoading ? null : () => context.go('/vehicles/auctions/active'),
+          onPressed: isLoading ? null : () => context.go('/vehicle-auctions/active'),
         ),
         const SizedBox(width: 16),
         CustomButton(

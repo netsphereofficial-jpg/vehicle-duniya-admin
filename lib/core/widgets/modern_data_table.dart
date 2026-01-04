@@ -219,45 +219,63 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
     _calculatedEntriesPerPage = entriesPerPage;
     final paginatedData = _getPaginatedData(entriesPerPage);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Table Header
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              border: Border(bottom: BorderSide(color: AppColors.border)),
-            ),
-            child: Row(
-              children: widget.columns.map((col) {
-                return _buildHeaderCell(col);
-              }).toList(),
-            ),
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-
-          // Table Rows
-          ...List.generate(paginatedData.length, (index) {
-            final item = paginatedData[index];
-            final actualIndex = _currentPage * entriesPerPage + index;
-            return _buildRow(item, actualIndex, index);
-          }),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Table Header
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  border: Border(bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.2), width: 2)),
+                ),
+                child: Row(
+                  children: widget.columns.map((col) {
+                    return _buildHeaderCell(col);
+                  }).toList(),
+                ),
+              ),
+
+              // Table Rows
+              ...List.generate(paginatedData.length, (index) {
+                final item = paginatedData[index];
+                final actualIndex = _currentPage * entriesPerPage + index;
+                return _buildRow(item, actualIndex, index);
+              }),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildHeaderCell(TableColumnDef<T> column) {
     Widget cell = Container(
-      height: 48,
+      height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: _getAlignment(column.align),
       child: Text(
         column.header.toUpperCase(),
         style: TextStyle(
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w700,
           fontSize: 12,
-          color: AppColors.textPrimary,
-          letterSpacing: 0.5,
+          color: AppColors.primary,
+          letterSpacing: 0.8,
         ),
       ),
     );
@@ -270,6 +288,17 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
 
   Widget _buildRow(T item, int actualIndex, int displayIndex) {
     final isHovered = _hoveredRowIndex == displayIndex;
+    final isEvenRow = displayIndex % 2 == 0;
+
+    // Determine background color based on hover state and alternating rows
+    Color backgroundColor;
+    if (isHovered) {
+      backgroundColor = AppColors.primary.withValues(alpha: 0.08);
+    } else if (isEvenRow) {
+      backgroundColor = AppColors.surface;
+    } else {
+      backgroundColor = AppColors.background.withValues(alpha: 0.5);
+    }
 
     return MouseRegion(
       onEnter: widget.enableHover ? (_) => setState(() => _hoveredRowIndex = displayIndex) : null,
@@ -279,8 +308,8 @@ class _ModernDataTableState<T> extends State<ModernDataTable<T>> {
         child: Container(
           constraints: BoxConstraints(minHeight: widget.rowHeight),
           decoration: BoxDecoration(
-            color: isHovered ? AppColors.primary.withValues(alpha: 0.04) : AppColors.surface,
-            border: Border(bottom: BorderSide(color: AppColors.borderLight)),
+            color: backgroundColor,
+            border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
           ),
           child: IntrinsicHeight(
             child: Row(

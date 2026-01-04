@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/modern_data_table.dart';
 import '../../domain/entities/auction.dart';
 import '../../domain/entities/vehicle_item.dart';
@@ -22,9 +21,8 @@ class AuctionDetailPage extends StatefulWidget {
   State<AuctionDetailPage> createState() => _AuctionDetailPageState();
 }
 
-class _AuctionDetailPageState extends State<AuctionDetailPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AuctionDetailPageState extends State<AuctionDetailPage> {
+  int _selectedTabIndex = 0;
   final _currencyFormat = NumberFormat.currency(
     locale: 'en_IN',
     symbol: '₹',
@@ -35,7 +33,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadAuctionData();
   }
 
@@ -43,12 +40,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
     context.read<AuctionBloc>()
       ..add(LoadAuctionDetailRequested(widget.auctionId))
       ..add(LoadAuctionVehiclesRequested(widget.auctionId));
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
@@ -69,6 +60,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
         final isLoading = state.isLoading;
 
         return Scaffold(
+          backgroundColor: AppColors.background,
           body: isLoading && auction == null
               ? const Center(child: CircularProgressIndicator())
               : auction == null
@@ -85,7 +77,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.search_off,
+            Icons.search_off_rounded,
             size: 64,
             color: AppColors.textSecondary,
           ),
@@ -94,14 +86,15 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
             'Auction not found',
             style: TextStyle(
               fontSize: 18,
+              fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 24),
-          CustomButton(
-            text: 'Go Back',
-            type: ButtonType.outline,
+          OutlinedButton.icon(
             onPressed: () => context.go('/vehicle-auctions/active'),
+            icon: const Icon(Icons.arrow_back, size: 18),
+            label: const Text('Go Back'),
           ),
         ],
       ),
@@ -111,90 +104,119 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
   Widget _buildContent(BuildContext context, Auction auction, AuctionState state) {
     return Column(
       children: [
-        _buildHeader(context, auction),
-        TabBar(
-          controller: _tabController,
-          labelColor: Theme.of(context).colorScheme.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: Theme.of(context).colorScheme.primary,
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.info_outline),
-              text: 'Auction Details',
-            ),
-            Tab(
-              icon: const Icon(Icons.directions_car),
-              text: 'Vehicles (${state.auctionVehicles.length})',
-            ),
-          ],
-        ),
+        _buildHeader(context, auction, state),
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildDetailsTab(auction),
-              _buildVehiclesTab(state),
-            ],
-          ),
+          child: _selectedTabIndex == 0
+              ? _buildDetailsTab(auction)
+              : _buildVehiclesTab(state),
         ),
       ],
     );
   }
 
-  Widget _buildHeader(BuildContext context, Auction auction) {
+  Widget _buildHeader(BuildContext context, Auction auction, AuctionState state) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        border: Border(
-          bottom: BorderSide(color: AppColors.border),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => context.go('/vehicle-auctions/active'),
-            icon: const Icon(Icons.arrow_back),
-            tooltip: 'Back',
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  auction.name,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Top row: Back button, title, status, edit
+          Row(
+            children: [
+              // Back button
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 4),
-                Row(
+                child: IconButton(
+                  onPressed: () => context.go('/vehicle-auctions/active'),
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  tooltip: 'Back',
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Title and meta
+              Expanded(
+                child: Row(
                   children: [
+                    Flexible(
+                      child: Text(
+                        auction.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     _buildStatusBadge(auction.status),
-                    const SizedBox(width: 12),
-                    Text(
-                      auction.categoryName.isNotEmpty
-                          ? auction.categoryName
-                          : 'Category: ${auction.category}',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${auction.vehicleCount} vehicles',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 16),
+              // Meta info chips
+              _buildMetaChip(
+                icon: Icons.category_outlined,
+                label: auction.categoryName.isNotEmpty
+                    ? auction.categoryName
+                    : auction.category,
+              ),
+              const SizedBox(width: 8),
+              _buildMetaChip(
+                icon: Icons.directions_car_outlined,
+                label: '${state.auctionVehicles.length} vehicles',
+              ),
+              const SizedBox(width: 16),
+              // Edit button
+              FilledButton.icon(
+                onPressed: () => context.go('/vehicle-auctions/${auction.id}/edit'),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          CustomButton(
-            text: 'Edit',
-            type: ButtonType.outline,
-            icon: Icons.edit,
-            onPressed: () => context.go('/vehicle-auctions/${auction.id}/edit'),
+          const SizedBox(height: 16),
+          // Tab bar
+          _buildModernTabs(state),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaChip({required IconData icon, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -212,7 +234,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
         break;
       case AuctionStatus.live:
         color = Colors.green;
-        icon = Icons.play_circle;
+        icon = Icons.play_circle_filled;
         break;
       case AuctionStatus.ended:
         color = Colors.grey;
@@ -225,23 +247,22 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
           Text(
             status.displayName,
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w600,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
         ],
@@ -249,110 +270,250 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
     );
   }
 
-  Widget _buildDetailsTab(Auction auction) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildModernTabs(AuctionState state) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildInfoCard('Auction Information', [
-            _InfoRow('Name', auction.name),
-            _InfoRow('Category', auction.categoryName.isNotEmpty
-                ? auction.categoryName
-                : auction.category),
-            _InfoRow('Mode', auction.mode.displayName),
-            _InfoRow('Event Type', auction.eventType.displayName),
-            if (auction.eventId != null && auction.eventId!.isNotEmpty)
-              _InfoRow('Event ID', auction.eventId!),
-          ]),
-          const SizedBox(height: 24),
-          _buildInfoCard('Schedule', [
-            _InfoRow('Start Date', _dateFormat.format(auction.startDate)),
-            _InfoRow('End Date', _dateFormat.format(auction.endDate)),
-            _InfoRow('Duration', _formatDuration(auction.duration)),
-            _InfoRow('Status', auction.status.displayName),
-          ]),
-          const SizedBox(height: 24),
-          _buildInfoCard('Configuration', [
-            _InfoRow('Check Base Price', auction.checkBasePrice ? 'Yes' : 'No'),
-            _InfoRow('Zip Type', auction.zipType.displayName),
-            _InfoRow('Total Vehicles', auction.vehicleCount.toString()),
-          ]),
-          const SizedBox(height: 24),
-          _buildInfoCard('Files', [
-            _InfoRow(
-              'Bid Report',
-              auction.bidReportUrl != null && auction.bidReportUrl!.isNotEmpty
-                  ? 'Uploaded'
-                  : 'Not uploaded',
-            ),
-            _InfoRow(
-              'Images Zip',
-              auction.imagesZipUrl != null && auction.imagesZipUrl!.isNotEmpty
-                  ? 'Uploaded'
-                  : 'Not uploaded',
-            ),
-          ]),
-          const SizedBox(height: 24),
-          _buildInfoCard('Metadata', [
-            _InfoRow('Created By', auction.createdBy),
-            _InfoRow('Created At', _dateFormat.format(auction.createdAt)),
-            _InfoRow('Updated At', _dateFormat.format(auction.updatedAt)),
-          ]),
+          _buildTab(
+            index: 0,
+            icon: Icons.info_outline,
+            label: 'Details',
+          ),
+          const SizedBox(width: 4),
+          _buildTab(
+            index: 1,
+            icon: Icons.directions_car_outlined,
+            label: 'Vehicles (${state.auctionVehicles.length})',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard(String title, List<_InfoRow> rows) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildTab({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final isSelected = _selectedTabIndex == index;
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTabIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 8),
             Text(
-              title,
+              label,
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 16),
-            ...rows.map((row) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 180,
-                    child: Text(
-                      row.label,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      row.value,
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDetailsTab(Auction auction) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left column
+          Expanded(
+            child: Column(
+              children: [
+                _buildInfoCard(
+                  icon: Icons.gavel_outlined,
+                  title: 'Auction Information',
+                  rows: [
+                    _InfoRow('Name', auction.name),
+                    _InfoRow('Category', auction.categoryName.isNotEmpty
+                        ? auction.categoryName
+                        : auction.category),
+                    _InfoRow('Mode', auction.mode.displayName),
+                    _InfoRow('Event Type', auction.eventType.displayName),
+                    if (auction.eventId != null && auction.eventId!.isNotEmpty)
+                      _InfoRow('Event ID', auction.eventId!),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildInfoCard(
+                  icon: Icons.settings_outlined,
+                  title: 'Configuration',
+                  rows: [
+                    _InfoRow('Check Base Price', auction.checkBasePrice ? 'Yes' : 'No'),
+                    _InfoRow('Zip Type', auction.zipType.displayName),
+                    _InfoRow('Total Vehicles', auction.vehicleCount.toString()),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildInfoCard(
+                  icon: Icons.person_outline,
+                  title: 'Metadata',
+                  rows: [
+                    _InfoRow('Created By', auction.createdBy),
+                    _InfoRow('Created At', _dateFormat.format(auction.createdAt)),
+                    _InfoRow('Updated At', _dateFormat.format(auction.updatedAt)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          // Right column
+          Expanded(
+            child: Column(
+              children: [
+                _buildInfoCard(
+                  icon: Icons.schedule_outlined,
+                  title: 'Schedule',
+                  rows: [
+                    _InfoRow('Start Date', _dateFormat.format(auction.startDate)),
+                    _InfoRow('End Date', _dateFormat.format(auction.endDate)),
+                    _InfoRow('Duration', _formatDuration(auction.duration)),
+                    _InfoRow('Status', auction.status.displayName),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildInfoCard(
+                  icon: Icons.folder_outlined,
+                  title: 'Files',
+                  rows: [
+                    _InfoRow(
+                      'Bid Report',
+                      auction.bidReportUrl != null && auction.bidReportUrl!.isNotEmpty
+                          ? 'Uploaded'
+                          : 'Not uploaded',
+                      valueColor: auction.bidReportUrl != null && auction.bidReportUrl!.isNotEmpty
+                          ? Colors.green
+                          : AppColors.textSecondary,
+                    ),
+                    _InfoRow(
+                      'Images Zip',
+                      auction.imagesZipUrl != null && auction.imagesZipUrl!.isNotEmpty
+                          ? 'Uploaded'
+                          : 'Not uploaded',
+                      valueColor: auction.imagesZipUrl != null && auction.imagesZipUrl!.isNotEmpty
+                          ? Colors.green
+                          : AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required List<_InfoRow> rows,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: AppColors.primary),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Card content
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: rows.asMap().entries.map((entry) {
+                final isLast = entry.key == rows.length - 1;
+                final row = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 130,
+                        child: Text(
+                          row.label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          row.value,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: row.valueColor ?? AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -365,7 +526,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
     if (days > 0) {
       return '$days day${days > 1 ? 's' : ''}, $hours hour${hours > 1 ? 's' : ''}';
     } else if (hours > 0) {
-      return '$hours hour${hours > 1 ? 's' : ''}, $minutes minute${minutes > 1 ? 's' : ''}';
+      return '$hours hour${hours > 1 ? 's' : ''}, $minutes min${minutes > 1 ? 's' : ''}';
     } else {
       return '$minutes minute${minutes > 1 ? 's' : ''}';
     }
@@ -386,10 +547,14 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
       columns: [
         TableColumnDef<VehicleItem>(
           header: '#',
-          width: 60,
+          width: 50,
           cellBuilder: (item, index) => Text(
             '${index + 1}',
-            style: const TextStyle(fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
           ),
         ),
         TableColumnDef<VehicleItem>(
@@ -397,7 +562,10 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
           flex: 1,
           cellBuilder: (item, index) => Text(
             item.contractNo.isNotEmpty ? item.contractNo : '-',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
           ),
         ),
         TableColumnDef<VehicleItem>(
@@ -405,6 +573,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
           flex: 1,
           cellBuilder: (item, index) => Text(
             item.rcNo.isNotEmpty ? item.rcNo : '-',
+            style: const TextStyle(fontSize: 13),
           ),
         ),
         TableColumnDef<VehicleItem>(
@@ -416,13 +585,17 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
             children: [
               Text(
                 '${item.make} ${item.model}',
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
               if (item.yom > 0)
                 Text(
                   'YOM: ${item.yom}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -438,14 +611,19 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
             children: [
               Text(
                 item.yardName.isNotEmpty ? item.yardName : '-',
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 item.location,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: AppColors.textSecondary,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -458,59 +636,61 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
             item.basePrice > 0 ? _currencyFormat.format(item.basePrice) : '-',
             style: TextStyle(
               fontWeight: FontWeight.w600,
+              fontSize: 13,
               color: AppColors.primary,
             ),
           ),
         ),
         TableColumnDef<VehicleItem>(
-          header: 'Bid Increment',
-          flex: 0.8,
+          header: 'Increment',
+          width: 100,
           align: TextAlign.right,
           cellBuilder: (item, index) => Text(
             item.bidIncrement > 0
                 ? _currencyFormat.format(item.bidIncrement)
                 : '-',
             style: TextStyle(
+              fontSize: 13,
               color: AppColors.textSecondary,
             ),
           ),
         ),
         TableColumnDef<VehicleItem>(
           header: 'Images',
-          width: 80,
+          width: 70,
           align: TextAlign.center,
           cellBuilder: (item, index) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: item.hasImages
                   ? Colors.green.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+                  : AppColors.background,
+              borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               '${item.imageCount}',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: item.hasImages ? Colors.green : Colors.grey,
+                color: item.hasImages ? Colors.green : AppColors.textSecondary,
               ),
             ),
           ),
         ),
         TableColumnDef<VehicleItem>(
-          header: 'Actions',
-          width: 100,
+          header: '',
+          width: 50,
           align: TextAlign.center,
-          cellBuilder: (item, index) => Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.visibility, size: 20),
-                tooltip: 'View Details',
-                onPressed: () => _showVehicleDetails(item),
-                color: AppColors.primary,
-              ),
-            ],
+          cellBuilder: (item, index) => IconButton(
+            icon: Icon(
+              Icons.visibility_outlined,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+            tooltip: 'View Details',
+            onPressed: () => _showVehicleDetails(item),
+            visualDensity: VisualDensity.compact,
+            hoverColor: AppColors.primary.withValues(alpha: 0.1),
           ),
         ),
       ],
@@ -523,66 +703,93 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+          constraints: const BoxConstraints(maxWidth: 550, maxHeight: 650),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Dialog header
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.05),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  border: Border(
+                    bottom: BorderSide(color: AppColors.border),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.directions_car,
-                      color: Theme.of(context).colorScheme.primary,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.directions_car,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
-                      child: Text(
-                        '${vehicle.make} ${vehicle.model}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${vehicle.make} ${vehicle.model}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (vehicle.yom > 0)
+                            Text(
+                              'Year: ${vehicle.yom}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.background,
+                      ),
                     ),
                   ],
                 ),
               ),
+              // Dialog content
               Flexible(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailSection('Identification', [
+                      _buildDialogSection('Identification', [
                         _DetailItem('Contract No', vehicle.contractNo),
                         _DetailItem('RC No', vehicle.rcNo),
                         _DetailItem('Engine No', vehicle.engineNo),
                         _DetailItem('Chassis No', vehicle.chassisNo),
                       ]),
-                      const SizedBox(height: 20),
-                      _buildDetailSection('Vehicle Details', [
+                      _buildDialogSection('Vehicle Details', [
                         _DetailItem('Make', vehicle.make),
                         _DetailItem('Model', vehicle.model),
-                        _DetailItem('Year of Manufacture', vehicle.yom.toString()),
+                        _DetailItem('Year of Manufacture', vehicle.yom > 0 ? vehicle.yom.toString() : '-'),
                         _DetailItem('Fuel Type', vehicle.fuelType),
-                        _DetailItem('PPT', vehicle.ppt),
+                        if (vehicle.ppt.isNotEmpty) _DetailItem('PPT', vehicle.ppt),
                       ]),
-                      const SizedBox(height: 20),
-                      _buildDetailSection('Location', [
+                      _buildDialogSection('Location', [
                         _DetailItem('Yard Name', vehicle.yardName),
                         _DetailItem('City', vehicle.yardCity),
                         _DetailItem('State', vehicle.yardState),
                       ]),
-                      const SizedBox(height: 20),
-                      _buildDetailSection('Pricing', [
+                      _buildDialogSection('Pricing', [
                         _DetailItem('Base Price', _currencyFormat.format(vehicle.basePrice)),
                         _DetailItem('Bid Increment', _currencyFormat.format(vehicle.bidIncrement)),
                         if (vehicle.multipleAmount > 0)
@@ -590,8 +797,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
                         if (vehicle.currentBid > 0)
                           _DetailItem('Current Bid', _currencyFormat.format(vehicle.currentBid)),
                       ]),
-                      const SizedBox(height: 20),
-                      _buildDetailSection('Additional Info', [
+                      _buildDialogSection('Additional Info', [
                         _DetailItem('RC Available', vehicle.rcAvailable ? 'Yes' : 'No'),
                         if (vehicle.repoDate != null)
                           _DetailItem('Repo Date', _dateFormat.format(vehicle.repoDate!)),
@@ -603,17 +809,23 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
                           _DetailItem('Remark', vehicle.remark!),
                       ]),
                       if (vehicle.hasImages) ...[
-                        const SizedBox(height: 20),
-                        Text(
-                          'Images (${vehicle.imageCount})',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Icon(Icons.photo_library_outlined, size: 16, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Images (${vehicle.imageCount})',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         SizedBox(
-                          height: 100,
+                          height: 80,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
                             itemCount: vehicle.images.length,
@@ -623,14 +835,17 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(
                                   vehicle.images[index],
-                                  width: 100,
-                                  height: 100,
+                                  width: 80,
+                                  height: 80,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
-                                    width: 100,
-                                    height: 100,
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.broken_image),
+                                    width: 80,
+                                    height: 80,
+                                    color: AppColors.background,
+                                    child: Icon(
+                                      Icons.broken_image_outlined,
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -649,43 +864,65 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
     );
   }
 
-  Widget _buildDetailSection(String title, List<_DetailItem> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...items.where((item) => item.value.isNotEmpty && item.value != '0').map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 140,
-                  child: Text(
-                    item.label,
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    item.value,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
+  Widget _buildDialogSection(String title, List<_DetailItem> items) {
+    final filteredItems = items.where(
+      (item) => item.value.isNotEmpty && item.value != '0' && item.value != '-',
+    ).toList();
+
+    if (filteredItems.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: AppColors.primary,
+              ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          ...filteredItems.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 130,
+                    child: Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      item.value,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -693,8 +930,9 @@ class _AuctionDetailPageState extends State<AuctionDetailPage>
 class _InfoRow {
   final String label;
   final String value;
+  final Color? valueColor;
 
-  _InfoRow(this.label, this.value);
+  _InfoRow(this.label, this.value, {this.valueColor});
 }
 
 class _DetailItem {
